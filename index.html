@@ -25,7 +25,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .plan-chip{background:var(--surface2);border:1.5px solid #3a3a45;border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:pointer;flex-shrink:0;transition:all .15s}
 .plan-chip.active{background:var(--accent);border-color:var(--accent);color:#0d0d0f}
 .plan-chip-add{background:transparent;border:1.5px dashed #3a3a45;border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;flex-shrink:0}
-.screen{display:none;padding:16px;padding-bottom:110px}
+.screen{display:none;padding:16px;padding-bottom:120px}
 .screen.active{display:block}
 .phase-card{border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;border:1px solid #2a2a33}
 .phase-label{font-size:10px;font-weight:600;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
@@ -96,7 +96,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
 .tov-next{font-size:13px;color:var(--muted);text-align:center}
 .tov-next strong{color:var(--text)}
 .tov-skip{background:var(--surface);border:1px solid #2a2a33;color:var(--text);border-radius:var(--radius);font-size:15px;font-weight:500;padding:12px 36px;cursor:pointer}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid #2a2a33;display:flex;padding:10px 0 28px;z-index:100}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid #2a2a33;display:flex;padding:14px 0 36px;z-index:100}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;transition:color .2s}
 .nav-btn.active{color:var(--accent)}
 .nav-btn span{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
@@ -370,9 +370,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min
     <div class="s-row"><div class="s-lbl" data-i="field.planname"></div><input class="s-inp" id="newPlanName" type="text"></div>
     <div class="modal-btns">
       <div class="m-btn accent" id="btn-plan-empty" onclick="createPlan('empty')"></div>
-      <div class="m-btn" id="btn-plan-copy" onclick="createPlan('copy')"></div>
+      <div class="m-btn" id="btn-plan-copy" onclick="openCopySourceModal()"></div>
     </div>
     <div class="m-cancel" onclick="closeModal('modalAddPlan')" data-i="btn.cancel"></div>
+  </div>
+</div>
+
+<!-- MODAL: SELECT PLAN TO COPY FROM -->
+<div class="modal-overlay" id="modalCopySource">
+  <div class="modal">
+    <div class="modal-title" id="mcs-title"></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="mcs-sub"></p>
+    <div id="copy-source-list"></div>
+    <div class="m-cancel" onclick="closeCopySourceModal()" data-i="btn.cancel"></div>
   </div>
 </div>
 
@@ -517,9 +527,11 @@ const T = {
     'import.success':'Daten erfolgreich importiert!','import.error':'Ungültige Datei.',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
     'history.plan':'Plan','history.time':'Uhrzeit','history.sets':'Sätze',
-    'plan.empty':'Leerer Plan','plan.copy':'Kopie des aktiven Plans',
-    'btn.plan-empty':'Leeren Plan erstellen','btn.plan-copy':'Kopie des aktiven Plans',
-    'workout.home.title':'BEREIT ZUM TRAINIEREN?','workout.home.sub':'Wähle einen Plan und starte dein Workout.',
+    'plan.empty':'Neuer leerer Plan','plan.copy':'Kopie',
+    'btn.plan-empty':'Leeren Plan erstellen','btn.plan-copy':'Plan kopieren',
+    'modal.copy-source':'WELCHEN PLAN KOPIEREN?','modal.copy-source.sub':'Wähle den Plan der kopiert werden soll:',
+    'workout.home.title':'BEREIT ZUM TRAINIEREN','workout.home.sub':'Wähle einen Plan und starte dein Workout.',
+    'workout.home.title.active':'TRAINING PAUSIERT','workout.home.sub.active':'Du hast ein Training begonnen. Möchtest du weitermachen?',
     'workout.start':'TRAINING STARTEN','workout.select.title':'PLAN AUSWÄHLEN','workout.select.sub':'Mit welchem Plan möchtest du trainieren?',
     'workout.active-plan':'Aktiver Plan','workout.continue':'WEITER MIT DIESEM PLAN',
     'history.detail.title':'TRAININGSDETAILS','history.detail.exercises':'ÜBUNGEN','history.detail.duration':'Dauer','history.detail.plan':'Plan',
@@ -579,9 +591,11 @@ const T = {
     'import.success':'Data imported successfully!','import.error':'Invalid file.',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
     'history.plan':'Plan','history.time':'Time','history.sets':'Sets',
-    'plan.empty':'Empty plan','plan.copy':'Copy of active plan',
-    'btn.plan-empty':'Create empty plan','btn.plan-copy':'Copy of active plan',
-    'workout.home.title':'READY TO TRAIN?','workout.home.sub':'Choose a plan and start your workout.',
+    'plan.empty':'New empty plan','plan.copy':'Copy',
+    'btn.plan-empty':'Create empty plan','btn.plan-copy':'Copy a plan',
+    'modal.copy-source':'WHICH PLAN TO COPY?','modal.copy-source.sub':'Select the plan you want to copy:',
+    'workout.home.title':'READY TO TRAIN','workout.home.sub':'Choose a plan and start your workout.',
+    'workout.home.title.active':'WORKOUT PAUSED','workout.home.sub.active':'You have a workout in progress. Want to continue?',
     'workout.start':'START WORKOUT','workout.select.title':'SELECT PLAN','workout.select.sub':'Which plan do you want to train with?',
     'workout.active-plan':'Active plan','workout.continue':'CONTINUE WITH THIS PLAN',
     'history.detail.title':'WORKOUT DETAILS','history.detail.exercises':'EXERCISES','history.detail.duration':'Duration','history.detail.plan':'Plan',
@@ -774,12 +788,14 @@ function renderWorkout(){
 }
 
 function renderWorkoutHome(){
-  // Check if there's an active workout in progress (has any progress)
   const prog = getProg(state.activePlanId);
   const hasProgress = prog.doneExercises.length > 0 || Object.values(prog.completedSets).some(v=>v>0);
   const plan = activePlan();
   const done = prog.doneExercises.length, total = plan.exercises.length;
   const pct = total ? Math.round(done/total*100) : 0;
+
+  const homeTitle = hasProgress ? t('workout.home.title.active') : t('workout.home.title');
+  const homeSub   = hasProgress ? t('workout.home.sub.active')   : t('workout.home.sub');
 
   let bannerHTML = '';
   if(hasProgress){
@@ -787,7 +803,7 @@ function renderWorkoutHome(){
       <div class="wab-dot"></div>
       <div class="wab-info">
         <div class="wab-title">${plan.name.toUpperCase()}</div>
-        <div class="wab-sub">${t('workout.active.banner.sub')} · ${done}/${total} · ${pct}%</div>
+        <div class="wab-sub">${done}/${total} · ${pct}%</div>
       </div>
       <button class="wab-btn" onclick="event.stopPropagation();startWithPlan('${state.activePlanId}')">${t('workout.active.resume')}</button>
     </div>`;
@@ -797,9 +813,9 @@ function renderWorkoutHome(){
     ${bannerHTML}
     <div class="workout-home">
       <div>
-        <div class="workout-home-icon">🏋️</div>
-        <div class="workout-home-title">${t('workout.home.title')}</div>
-        <div class="workout-home-sub" style="margin:8px auto 0">${t('workout.home.sub')}</div>
+        <div class="workout-home-icon">${hasProgress ? '⏸️' : '🏋️'}</div>
+        <div class="workout-home-title">${homeTitle}</div>
+        <div class="workout-home-sub" style="margin:8px auto 0">${homeSub}</div>
       </div>
       <button class="btn-primary" style="max-width:300px" onclick="openPlanSelectModal()">${hasProgress ? t('workout.end.new') : t('workout.start')}</button>
     </div>`;
@@ -1447,13 +1463,51 @@ function savePlanEx(){
 // PLAN MANAGEMENT
 // ══════════════════════════════════════════════
 let renamingPlanId=null;
-function createPlan(mode){
-  const name=document.getElementById('newPlanName').value.trim()||t('plan.'+mode);
-  const newId=uid(); let phases,exercises;
-  if(mode==='copy'){ const ap=activePlan(); phases=ap.phases.map(ph=>({...ph,id:uid()})); const phMap={}; ap.phases.forEach((ph,i)=>phMap[ph.id]=phases[i].id); exercises=ap.exercises.map(e=>({...e,id:uid(),phaseId:e.phaseId?phMap[e.phaseId]:null})); }
-  else { const pid=uid(); phases=[{id:pid,name:'Phase 1',colorIdx:0}]; exercises=[]; }
-  state.plans.push({id:newId,name,phases,exercises}); state.activePlanId=newId; saveState();
-  closeModal('modalAddPlan'); renderPlanSwitcher(); renderPlansList(); renderWorkout();
+function createPlan(mode, sourcePlanId){
+  const name = document.getElementById('newPlanName').value.trim();
+  const newId = uid();
+  let phases, exercises, finalName;
+
+  if(mode==='copy' && sourcePlanId){
+    const src = state.plans.find(p=>p.id===sourcePlanId);
+    finalName = name || src.name + ' ('+t('plan.copy')+')';
+    phases = src.phases.map(ph=>({...ph,id:uid()}));
+    const phMap={};
+    src.phases.forEach((ph,i)=>phMap[ph.id]=phases[i].id);
+    exercises = src.exercises.map(e=>({...e,id:uid(),phaseId:e.phaseId?phMap[e.phaseId]:null}));
+  } else {
+    finalName = name || t('plan.empty');
+    const pid=uid();
+    phases=[{id:pid,name:'Phase 1',colorIdx:0}];
+    exercises=[];
+  }
+
+  state.plans.push({id:newId,name:finalName,phases,exercises});
+  state.activePlanId=newId;
+  saveState();
+  closeModal('modalAddPlan');
+  closeModal('modalCopySource');
+  renderPlansList();
+  renderWorkout();
+}
+
+function openCopySourceModal(){
+  // Only show if there are plans to copy from
+  if(state.plans.length === 0){ createPlan('empty'); return; }
+  document.getElementById('mcs-title').textContent = t('modal.copy-source');
+  document.getElementById('mcs-sub').textContent = t('modal.copy-source.sub');
+  document.getElementById('copy-source-list').innerHTML = state.plans.map(p=>`
+    <div class="plan-select-card" onclick="createPlan('copy','${p.id}')">
+      <div class="psc-name">${p.name}</div>
+      <div class="psc-meta">${p.phases.length} ${t('phases')} · ${p.exercises.length} ${t('exercises')}</div>
+    </div>`).join('');
+  openModal('modalCopySource');
+}
+
+function closeCopySourceModal(){
+  closeModal('modalCopySource');
+  // Re-open the add plan modal so the user can still create a plan
+  openModal('modalAddPlan');
 }
 function openRenamePlan(planId){ renamingPlanId=planId; document.getElementById('renamePlanInput').value=state.plans.find(p=>p.id===planId)?.name||''; openModal('modalRenamePlan'); }
 function confirmRenamePlan(){ const name=document.getElementById('renamePlanInput').value.trim(); if(name){const p=state.plans.find(p=>p.id===renamingPlanId);if(p)p.name=name;} saveState();closeModal('modalRenamePlan');renderPlanSwitcher();renderPlansList(); }
