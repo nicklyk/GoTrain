@@ -1,4 +1,4 @@
-# 🏋️ GoTrain
+# 🏋️ GymApp
 
 A mobile-first workout tracker as a single HTML file — no installation, no account, no server needed. Designed to run directly in Safari on iPhone and can be added to the home screen as a standalone app.
 
@@ -16,9 +16,8 @@ A mobile-first workout tracker as a single HTML file — no installation, no acc
 
 ## Usage
 
-1. Download `index.html`
-2. Host the file somewhere `(e.g Github)`
-3. Navigate to that website in Safari
+1. Download `trainingsplan.html`
+2. Open the file in **Safari** on your iPhone
 3. Tap the share icon → **"Add to Home Screen"**
 4. The app opens like a native app — no address bar, full screen
 
