@@ -1,5 +1,5 @@
 // GoTrain Service Worker
-const CACHE_NAME = 'gotrain-v1';
+const CACHE_NAME = 'gotrain-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,18 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png'
 ];
+
+// Cross-origin hosts we still want cached for offline use. Everything else
+// cross-origin is passed straight through to the network, untouched.
+const FONT_HOSTS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
+
+// Resolved once so shell matching is an exact pathname comparison. The old
+// `ASSETS.some(a => url.pathname.endsWith(a.replace('./', '')))` test matched
+// everything: './' collapses to '' and `endsWith('')` is always true, so every
+// request -- cross-origin ones included -- took the app-shell branch and its
+// `.catch(() => caches.match('./index.html'))`. A blocked request would then
+// resolve as a 200 full of our own HTML instead of rejecting.
+const SHELL_PATHS = new Set(ASSETS.map(a => new URL(a, self.location.href).pathname));
 
 // Install: cache all shell assets
 self.addEventListener('install', event => {
@@ -26,35 +38,51 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch: cache-first for shell, network-first for others
+// Fetch: cache-first for shell, network-first for fonts, hands off otherwise
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
+  const req = event.request;
 
-  // Always serve cached app shell from cache
-  if (ASSETS.some(a => url.pathname.endsWith(a.replace('./', '')))) {
+  // Only GETs are cacheable, and only our own origin plus the font CDNs are
+  // ours to answer. The sync flow talks to a LAN server on another origin;
+  // intercepting that would turn a network failure into a bogus success.
+  if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+  const sameOrigin = url.origin === self.location.origin;
+
+  if (!sameOrigin && !FONT_HOSTS.includes(url.origin)) return;
+
+  // App shell: cache-first, falling back to index.html only for navigations.
+  if (sameOrigin && SHELL_PATHS.has(url.pathname)) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
+      caches.match(req).then(cached => {
         if (cached) return cached;
-        return fetch(event.request).then(resp => {
+        return fetch(req).then(resp => {
           if (resp && resp.status === 200) {
             const clone = resp.clone();
-            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+            caches.open(CACHE_NAME).then(c => c.put(req, clone));
           }
           return resp;
-        }).catch(() => caches.match('./index.html'));
+        }).catch(err => {
+          if (req.mode === 'navigate') return caches.match('./index.html');
+          throw err;
+        });
       })
     );
     return;
   }
 
-  // For Google Fonts and other external resources: network with cache fallback
+  // Fonts and other same-origin assets: network with cache fallback.
   event.respondWith(
-    fetch(event.request).then(resp => {
+    fetch(req).then(resp => {
       if (resp && resp.status === 200 && resp.type !== 'opaque') {
         const clone = resp.clone();
-        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        caches.open(CACHE_NAME).then(c => c.put(req, clone));
       }
       return resp;
-    }).catch(() => caches.match(event.request))
+    }).catch(err => caches.match(req).then(cached => {
+      if (cached) return cached;
+      throw err;
+    }))
   );
 });
