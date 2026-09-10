@@ -391,6 +391,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="sec-label" id="lbl-sets-timer">SÄTZE / TIMER</div>
   <div id="d-sets"></div>
   <div id="next-ex-slot"></div>
+  <button class="btn-outline" id="d-adjust-btn" onclick="openAdjust()"></button>
   <button class="btn-primary" id="d-done-btn" onclick="markExDone()"></button>
   <button class="btn-secondary" id="d-undo-btn" onclick="undoExDone()" style="display:none"></button>
 </div>
@@ -591,6 +592,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 </div>
 
 <!-- MODAL: ADD PHASE -->
+<div class="modal-overlay" id="modalAdjust">
+  <div class="modal">
+    <div class="modal-title" data-i="modal.adjust"></div>
+    <div class="g-sub" id="adjust-hint" style="margin-bottom:14px"></div>
+    <div id="adjust-fields"></div>
+    <div class="modal-btns">
+      <div class="m-btn accent" onclick="saveAdjust()" data-i="btn.save"></div>
+      <div class="m-btn" id="adjust-reset-btn" onclick="resetAdjust()" data-i="btn.adjust.reset"></div>
+    </div>
+    <div class="m-cancel" onclick="closeModal('modalAdjust')" data-i="btn.cancel"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalAddPhase">
   <div class="modal">
     <div class="modal-title" data-i="modal.addphase"></div>
@@ -690,6 +704,11 @@ const T = {
     'gex.desc':'Definiere Übungen einmalig. Beim Hinzufügen zu einem Plan können sie angepasst werden.',
     'planex.desc':'Aus globalen Übungen wählen oder neu erstellen:',
     'plan.empty':'Leerer Plan','plan.copy':'Kopie des aktiven Plans',
+    'btn.adjust':'✏️ Für heute anpassen','btn.adjust.edit':'✏️ Anpassung ändern',
+    'btn.adjust.reset':'Auf Plan zurücksetzen','modal.adjust':'FÜR HEUTE ANPASSEN',
+    'adjust.hint':'Gilt nur für dieses Training. Dein Plan bleibt unverändert.',
+    'adjust.plan':'Plan:','adjust.active':'Heute angepasst – Plan unverändert',
+    'set.undo.hint':'Tippen zum Zurücknehmen',
     'activate':'Aktivieren','activated':'✓ Aktiv','edit':'✏️ Bearbeiten','rename':'Umbenennen',
     'phases':'Phasen','exercises':'Übungen','exercises.abbr':'Übg.','add-phase':'+ PHASE HINZUFÜGEN','add-ex':'+ ÜBUNG HINZUFÜGEN',
     'no-phase':'Keine Phase','no-gex':'Noch keine globalen Übungen definiert.',
@@ -768,6 +787,11 @@ const T = {
     'gex.desc':'Define exercises once here. They can be customized when added to a plan.',
     'planex.desc':'Choose from global exercises or create a new one:',
     'plan.empty':'Empty plan','plan.copy':'Copy of active plan',
+    'btn.adjust':'✏️ Adjust for today','btn.adjust.edit':'✏️ Change adjustment',
+    'btn.adjust.reset':'Reset to plan','modal.adjust':'ADJUST FOR TODAY',
+    'adjust.hint':'Applies to this session only. Your plan stays unchanged.',
+    'adjust.plan':'Plan:','adjust.active':'Adjusted for today – plan unchanged',
+    'set.undo.hint':'Tap to undo',
     'activate':'Activate','activated':'✓ Active','edit':'✏️ Edit','rename':'Rename',
     'phases':'Phases','exercises':'Exercises','exercises.abbr':'ex.','add-phase':'+ ADD PHASE','add-ex':'+ ADD EXERCISE',
     'no-phase':'No phase','no-gex':'No global exercises defined yet.',
@@ -879,6 +903,7 @@ function applyTranslations(){
   });
   document.getElementById('d-done-btn').textContent = t('complete');
   document.getElementById('d-undo-btn').textContent = t('undo');
+  document.getElementById('d-adjust-btn').textContent = t('btn.adjust');
   document.getElementById('lbl-sets-timer').textContent = t('timer');
   document.getElementById('tov-lbl').textContent = t('timer.lbl');
   document.getElementById('tov-skip').textContent = t('skip');
@@ -926,8 +951,27 @@ function changeLang(l){
 function activePlan(){ return state.plans.find(p=>p.id===state.activePlanId)||state.plans[0]; }
 function hasPlan(){ return !!activePlan(); }
 function getPlanById(id){ return state.plans.find(p=>p.id===id); }
-function getEx(exId){ return activePlan().exercises.find(e=>e.id===exId); }
-function getProg(planId){ if(!state.progress[planId]) state.progress[planId]={completedSets:{},doneExercises:[]}; return state.progress[planId]; }
+// The exercise as the plan defines it -- the thing that must not change when
+// you adjust a weight for one session.
+function planEx(exId){ return activePlan().exercises.find(e=>e.id===exId); }
+
+// The exercise as it applies to today: the plan values with this session's
+// adjustments laid over them. Overrides live in the session's progress entry,
+// so starting a new workout drops them and the plan's own numbers come back.
+function getEx(exId){
+  const base=planEx(exId); if(!base) return base;
+  return Object.assign({}, base, exOverride(exId)||{});
+}
+function exOverride(exId){ return getProg(state.activePlanId).overrides[exId]||null; }
+function isAdjusted(exId){ const o=exOverride(exId); return !!o && Object.keys(o).length>0; }
+
+function getProg(planId){
+  if(!state.progress[planId]) state.progress[planId]=emptyProgress();
+  const p=state.progress[planId];
+  if(!p.overrides) p.overrides={};   // progress saved before overrides existed
+  return p;
+}
+function emptyProgress(){ return {completedSets:{},doneExercises:[],overrides:{}}; }
 function getSets(exId){ return getProg(state.activePlanId).completedSets[exId]||0; }
 function setSets(exId,n){ getProg(state.activePlanId).completedSets[exId]=n; }
 function isDone(exId){ return getProg(state.activePlanId).doneExercises.includes(exId); }
@@ -1077,7 +1121,7 @@ function renderWorkoutActive(){
 function abortWorkout(){
   if(!confirm(t('workout.abort.confirm'))) return;
   // Discard progress, no history entry
-  state.progress[state.activePlanId]={completedSets:{},doneExercises:[]};
+  state.progress[state.activePlanId]=emptyProgress();
   saveState();
   clearInterval(wuInt); wuRunning=false; swStopAll(); clearInterval(pauseInt); onWorkoutEnded();
   document.getElementById('timerOverlay').classList.remove('active');
@@ -1099,7 +1143,7 @@ function finishWorkout(){
   if(!confirm(t('workout.end.confirm'))) return;
   saveHistory();
   // Reset progress for this plan
-  state.progress[state.activePlanId]={completedSets:{},doneExercises:[]};
+  state.progress[state.activePlanId]=emptyProgress();
   saveState();
   clearInterval(wuInt); wuRunning=false; swStopAll(); onWorkoutEnded();
   workoutMode='home';
@@ -1125,7 +1169,10 @@ function openPlanSelectModal(){
   openModal('modalSelectPlan');
 }
 
-function exItemHTML(ex){
+function exItemHTML(planExercise){
+  // Render today's values, not the plan's, so an adjustment is visible in the
+  // list and not only inside the exercise.
+  const ex=getEx(planExercise.id)||planExercise;
   const done=isDone(ex.id), ds=getSets(ex.id);
   let dots='';
   if(ex.type==='reps') for(let i=0;i<ex.sets;i++) dots+=`<div class="dot ${i<ds?'done':''}"></div>`;
@@ -1169,11 +1216,17 @@ function openDetail(exId){
     grid.innerHTML=h;
   }
   const noteEl=document.getElementById('d-note');
-  if(ex.note){noteEl.textContent='⚙️  '+ex.note;noteEl.style.display='block';}else noteEl.style.display='none';
+  const notes=[];
+  if(isAdjusted(exId)) notes.push('✏️  '+t('adjust.active'));
+  if(ex.note) notes.push('⚙️  '+ex.note);
+  if(notes.length){noteEl.textContent=notes.join('   ');noteEl.style.display='block';}
+  else noteEl.style.display='none';
   renderSetRows(ex);
   // Clear any previous next-exercise banner
   const slot = document.getElementById('next-ex-slot');
   if(slot) slot.innerHTML = '';
+  const adj=document.getElementById('d-adjust-btn');
+  if(adj) adj.textContent = isAdjusted(exId) ? t('btn.adjust.edit') : t('btn.adjust');
   const btn=document.getElementById('d-done-btn'), undo=document.getElementById('d-undo-btn');
   if(isDone(exId)){btn.textContent=t('done');btn.disabled=true;undo.style.display='block';}
   else{btn.textContent=t('complete');btn.disabled=false;undo.style.display='none';}
@@ -1188,6 +1241,86 @@ function goBack(){
   workoutMode='active';
   showScreen('workout');
   setWorkoutHeader(activePlan().name);
+}
+
+// ══════════════════════════════════════════════
+// ADJUST FOR TODAY
+// ══════════════════════════════════════════════
+// Changes here are written to the session's progress entry, never to the
+// plan. Finishing or starting a workout clears them, so the next session
+// begins from the numbers set in Settings again.
+
+const ADJUST_FIELDS = {
+  reps: [
+    {key:'kg',   label:'field.weight', hint:'kg',            type:'text'},
+    {key:'reps', label:'field.reps',   hint:'reps.abbr',     type:'text'},
+    {key:'sets', label:'field.sets',   hint:'field.sets',    type:'number'}
+  ],
+  time: [
+    {key:'durationMin', label:'field.duration', hint:'completed.min', type:'text'}
+  ]
+};
+
+function adjustFields(ex){ return ADJUST_FIELDS[ex.type==='time'?'time':'reps']; }
+
+function openAdjust(){
+  const ex=getEx(currentExId), base=planEx(currentExId);
+  if(!ex||!base) return;
+  document.getElementById('adjust-hint').textContent=t('adjust.hint');
+  document.getElementById('adjust-fields').innerHTML=adjustFields(ex).map(f=>{
+    const planVal=base[f.key]===undefined||base[f.key]===''?'–':base[f.key];
+    return `<div class="s-row">
+      <div class="s-lbl">${t(f.label)}
+        <div class="g-sub">${t('adjust.plan')} ${planVal}</div>
+      </div>
+      <input class="s-inp" id="adj-${f.key}" type="${f.type}" inputmode="decimal"
+             value="${ex[f.key]===undefined?'':ex[f.key]}">
+    </div>`;
+  }).join('');
+  document.getElementById('adjust-reset-btn').style.display = isAdjusted(currentExId)?'':'none';
+  openModal('modalAdjust');
+}
+
+function saveAdjust(){
+  const exId=currentExId, base=planEx(exId); if(!base) return;
+  const patch={};
+  adjustFields(base).forEach(f=>{
+    const el=document.getElementById('adj-'+f.key); if(!el) return;
+    let val=el.value.trim();
+    if(f.key==='sets'){
+      const n=parseInt(val,10);
+      if(!isFinite(n)||n<1) return;       // a plan with zero sets makes no sense
+      val=n;
+    }
+    // Only record what actually differs, so "adjusted" means adjusted.
+    if(String(val)!==String(base[f.key]===undefined?'':base[f.key])) patch[f.key]=val;
+  });
+
+  const prog=getProg(state.activePlanId);
+  if(Object.keys(patch).length) prog.overrides[exId]=patch;
+  else delete prog.overrides[exId];
+
+  clampSets(exId);
+  saveState(); updateProgress();
+  closeModal('modalAdjust');
+  openDetail(exId);
+}
+
+function resetAdjust(){
+  delete getProg(state.activePlanId).overrides[currentExId];
+  clampSets(currentExId);
+  saveState(); updateProgress();
+  closeModal('modalAdjust');
+  openDetail(currentExId);
+}
+
+// Lowering the set count below what is already ticked off would leave the
+// exercise reporting more completed sets than it has.
+function clampSets(exId){
+  const ex=getEx(exId); if(!ex||ex.type==='time') return;
+  const max=parseInt(ex.sets,10)||0;
+  if(getSets(exId)>max){ setSets(exId,max); }
+  if(max>0&&getSets(exId)<max) unsetDone(exId);
 }
 
 function renderSetRows(ex){
@@ -1213,7 +1346,7 @@ function renderSetRows(ex){
     const iDone=i<=done, isNext=i===done+1, isLocked=i>done+1;
     const kg=ex.kg?`<span class="wbadge">${ex.kg} kg</span>`:'';
     h+=`<div class="set-row ${iDone?'done-row':''} ${isLocked?'locked':''}" id="sr-${ex.id}-${i}">
-      <div class="sr-left" style="cursor:${isLocked?'default':'pointer'}">
+      <div class="sr-left" style="cursor:${isLocked?'default':'pointer'}" title="${iDone?t('set.undo.hint'):''}">
         <div class="sr-num">${i}</div>
         <div><div class="sr-label">${t('set')} ${i} · ${ex.reps||'–'} ${t('reps.abbr')}${kg}</div>
           ${ex.sithoehe?`<div class="sr-sub">${t('seatheight.abbr')} ${ex.sithoehe}</div>`:''}
@@ -1229,23 +1362,50 @@ function renderSetRows(ex){
   }
   cont.innerHTML=h;
   for(let i=1;i<=ex.sets;i++){
-    const iDone=i<=done, isLocked=i>done+1;
-    if(!isLocked&&!iDone){
-      const row=document.getElementById('sr-'+ex.id+'-'+i); if(!row) continue;
-      const ii=i;
-      row.querySelector('.sr-left').onclick=()=>completeSet(ex.id,ii);
-      row.querySelector('.chk').onclick=()=>completeSet(ex.id,ii);
-    }
+    const isLocked=i>done+1;
+    if(isLocked) continue;                 // still out of reach
+    const row=document.getElementById('sr-'+ex.id+'-'+i); if(!row) continue;
+    const ii=i;
+    row.querySelector('.sr-left').onclick=()=>toggleSet(ex.id,ii);
+    row.querySelector('.chk').onclick=()=>toggleSet(ex.id,ii);
   }
 }
 
 function completeTimeEx(){
-  if(isDone(currentExId)) return;
+  if(isDone(currentExId)){          // tapping a finished timed exercise undoes it
+    unsetDone(currentExId); setSets(currentExId,0);
+    saveState(); updateProgress(); openDetail(currentExId);
+    return;
+  }
   setDone(currentExId); setSets(currentExId,1); saveState(); updateProgress();
   const nextEx = findNextExercise(currentExId);
   openDetail(currentExId);
   if(nextEx) showNextExerciseBanner(nextEx.id);
 }
+// A tap on a set either completes the next one or takes back one already
+// ticked. Undoing set N leaves 1..N-1 done, which is the only sensible inverse
+// of a running count.
+function toggleSet(exId,setNum){
+  const done=getSets(exId);
+  if(setNum<=done) return uncompleteSet(exId,setNum);
+  if(setNum===done+1) return completeSet(exId,setNum);
+}
+
+function uncompleteSet(exId,setNum){
+  swStopAll();
+  // Dismiss the rest timer: it was counting down toward a set that is no
+  // longer next. `active` is the class the overlay actually uses.
+  clearInterval(pauseInt);
+  const wrap=document.getElementById('timerOverlay');
+  if(wrap) wrap.classList.remove('active');
+  setSets(exId,setNum-1);
+  // The last set auto-marks the exercise done, so taking one back has to
+  // reopen it or the exercise stays complete with a set missing.
+  unsetDone(exId);
+  saveState(); updateProgress();
+  openDetail(exId);
+}
+
 function completeSet(exId,setNum){
   if(setNum!==getSets(exId)+1)return;
   swStopAll(); setSets(exId,setNum); saveState();
@@ -1255,7 +1415,7 @@ function completeSet(exId,setNum){
     const iDone=i<=setNum, isNext=i===setNum+1, isLocked=i>setNum+1;
     row.className='set-row'+(iDone?' done-row':'')+(isLocked?' locked':'');
     row.querySelector('.chk').textContent=iDone?'✓':(isNext?'▶':'○');
-    if(!isLocked&&!iDone){ const ii=i; row.querySelector('.sr-left').onclick=()=>completeSet(exId,ii); row.querySelector('.chk').onclick=()=>completeSet(exId,ii); }
+    if(!isLocked){ const ii=i; row.querySelector('.sr-left').onclick=()=>toggleSet(exId,ii); row.querySelector('.chk').onclick=()=>toggleSet(exId,ii); }
   }
   updateProgress();
   if(setNum<ex.sets){
@@ -2016,7 +2176,7 @@ function newWorkout(){
   const prog=getProg(state.activePlanId);
   const hasProgress=prog.doneExercises.length>0||Object.values(prog.completedSets).some(v=>v>0);
   if(hasProgress) saveHistory();
-  state.progress[state.activePlanId]={completedSets:{},doneExercises:[]};
+  state.progress[state.activePlanId]=emptyProgress();
   saveState();clearInterval(wuInt);wuRunning=false;swStopAll();
   workoutMode='home'; showScreen('workout');window.scrollTo(0,0);
 }
@@ -2027,12 +2187,19 @@ function confirmResetAll(){ if(!confirm(t('confirm.reset-all')))return; localSto
 // ══════════════════════════════════════════════
 function saveHistory(){
   const plan=activePlan(), prog=getProg(state.activePlanId);
-  const exercises=plan.exercises.map(ex=>({
-    id:ex.id, icon:ex.icon, name:ex.name, muscle:ex.muscle, type:ex.type,
-    sets:ex.sets, reps:ex.reps, durationMin:ex.durationMin, kg:ex.kg,
-    setsCompleted: prog.completedSets[ex.id]||0,
-    done: prog.doneExercises.includes(ex.id)
-  }));
+  // Record the session's own values: if you dropped to 50kg today, the history
+  // -- and anything reading it later for progression -- must say 50, not the
+  // 60 still written in the plan.
+  const exercises=plan.exercises.map(pe=>{
+    const ex=getEx(pe.id)||pe;
+    return {
+      id:ex.id, icon:ex.icon, name:ex.name, muscle:ex.muscle, type:ex.type,
+      sets:ex.sets, reps:ex.reps, durationMin:ex.durationMin, kg:ex.kg,
+      adjusted: isAdjusted(pe.id) || undefined,
+      setsCompleted: prog.completedSets[ex.id]||0,
+      done: prog.doneExercises.includes(ex.id)
+    };
+  });
   const totalSets=Object.values(prog.completedSets).reduce((a,b)=>a+b,0);
   const doneCount=prog.doneExercises.length;
   const now=new Date();
