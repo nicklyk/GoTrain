@@ -697,6 +697,10 @@ const T = {
     'modal.addex':'ÜBUNG HINZUFÜGEN','modal.addphase':'PHASE HINZUFÜGEN',
     'field.planname':'Plan-Name','field.icon':'Icon','field.type':'Typ',
     'field.muscle':'Muskelgruppe','field.name':'Name','field.reps':'Wdh.',
+    'muscle.abs':'Bauch','muscle.back':'Rücken','muscle.biceps':'Bizeps','muscle.calves':'Waden',
+    'muscle.cardio':'Cardio','muscle.chest':'Brust','muscle.forearms':'Unterarme',
+    'muscle.fullbody':'Ganzkörper','muscle.general':'Allgemein','muscle.glutes':'Gesäß',
+    'muscle.legs':'Beine','muscle.neck':'Nacken','muscle.shoulders':'Schulter','muscle.triceps':'Trizeps',
     'field.sets':'Sätze','field.seatheight':'Sitzhöhe','field.weight':'Gewicht (kg)',
     'field.pause':'Pause (Sek., leer=Standard)','field.duration':'Dauer (Min.)',
     'field.note':'Notiz','field.phase':'Phase',
@@ -780,6 +784,10 @@ const T = {
     'modal.addex':'ADD EXERCISE','modal.addphase':'ADD PHASE',
     'field.planname':'Plan name','field.icon':'Icon','field.type':'Type',
     'field.muscle':'Muscle group','field.name':'Name','field.reps':'Reps',
+    'muscle.abs':'Abs','muscle.back':'Back','muscle.biceps':'Biceps','muscle.calves':'Calves',
+    'muscle.cardio':'Cardio','muscle.chest':'Chest','muscle.forearms':'Forearms',
+    'muscle.fullbody':'Full body','muscle.general':'General','muscle.glutes':'Glutes',
+    'muscle.legs':'Legs','muscle.neck':'Neck','muscle.shoulders':'Shoulders','muscle.triceps':'Triceps',
     'field.sets':'Sets','field.seatheight':'Seat height','field.weight':'Weight (kg)',
     'field.pause':'Rest (sec., empty=default)','field.duration':'Duration (min.)',
     'field.note':'Note','field.phase':'Phase',
@@ -837,7 +845,10 @@ const T = {
     'timer.done.notification':'Time is up – complete the exercise now!',
   }
 };
-function t(key){ return (T[lang]||T.de)[key] || (T.de)[key] || key; }
+// English is the app default, so it is also what a missing string falls back
+// to. This used to fall back to German, which is how German text surfaced in
+// an otherwise English UI.
+function t(key){ return (T[lang]||T.en)[key] || (T.en)[key] || key; }
 
 // ══════════════════════════════════════════════
 // CONSTANTS
@@ -845,12 +856,75 @@ function t(key){ return (T[lang]||T.de)[key] || (T.de)[key] || key; }
 const ICONS = ['🏃','🦵','🔙','🫁','💪','🔥','🏋️','⚡','🎯','🦾','🤸','🧘','🚴','🏊','⛹️','🎽','🧗','🤼','🥊','🤾'];
 const PHASE_COLORS = 5;
 
-const MUSCLE_GROUPS_DE = ['Bauch','Beine','Bizeps','Brust','Cardio','Gesäß','Nacken','Rücken','Schulter','Trizeps','Unterarme','Waden','Ganzkörper'];
-const MUSCLE_GROUPS_EN = ['Abs','Legs','Biceps','Chest','Cardio','Glutes','Neck','Back','Shoulders','Triceps','Forearms','Calves','Full Body'];
-function muscleGroups(){ return lang==='en' ? MUSCLE_GROUPS_EN : MUSCLE_GROUPS_DE; }
+// Muscle groups are stored as language-independent keys and translated only
+// when shown. Storing the visible word meant an exercise created in German
+// kept saying "Beine" in the English UI, and a plan could end up holding a mix
+// of both languages.
+const MUSCLE_KEYS = ['abs','back','biceps','calves','cardio','chest','forearms',
+  'fullbody','general','glutes','legs','neck','shoulders','triceps'];
+
+// Every label either language has ever written, mapped back to its key, so
+// existing data can be migrated exactly once.
+const MUSCLE_ALIASES = {
+  'bauch':'abs','abs':'abs',
+  'rücken':'back','ruecken':'back','back':'back',
+  'bizeps':'biceps','biceps':'biceps',
+  'waden':'calves','calves':'calves',
+  'cardio':'cardio',
+  'brust':'chest','chest':'chest',
+  'unterarme':'forearms','forearms':'forearms',
+  'ganzkörper':'fullbody','ganzkoerper':'fullbody','full body':'fullbody','fullbody':'fullbody',
+  'allgemein':'general','general':'general',
+  'gesäß':'glutes','gesaess':'glutes','glutes':'glutes',
+  'beine':'legs','legs':'legs',
+  'nacken':'neck','neck':'neck',
+  'schulter':'shoulders','shoulders':'shoulders',
+  'trizeps':'triceps','triceps':'triceps'
+};
+
+function muscleKey(value){
+  const v=String(value==null?'':value).trim();
+  if(!v) return '';
+  return MUSCLE_ALIASES[v.toLowerCase()] || v;   // unknown values are kept verbatim
+}
+
+// A key becomes a word only here. Anything unrecognised is shown as stored,
+// so a custom value is never silently replaced.
+function muscleLabel(value){
+  const v=String(value==null?'':value).trim();
+  if(!v) return '';
+  return MUSCLE_KEYS.indexOf(v)>=0 ? t('muscle.'+v) : v;
+}
+
+function muscleGroups(){
+  return MUSCLE_KEYS.slice().sort((a,b)=>muscleLabel(a).localeCompare(muscleLabel(b), lang));
+}
+
 function muscleSelectHTML(id, currentVal){
-  const opts = muscleGroups().map(m=>`<option value="${m}" ${m===currentVal?'selected':''}>${m}</option>`).join('');
-  return `<select class="s-inp" id="${id}"><option value="" ${!currentVal?'selected':''}>–</option>${opts}</select>`;
+  const cur=muscleKey(currentVal);
+  let opts = muscleGroups().map(k=>
+    `<option value="${k}" ${k===cur?'selected':''}>${muscleLabel(k)}</option>`).join('');
+  // Keep an unrecognised stored value selectable rather than dropping it.
+  if(cur && MUSCLE_KEYS.indexOf(cur)<0)
+    opts += `<option value="${cur}" selected>${cur}</option>`;
+  return `<select class="s-inp" id="${id}"><option value="" ${!cur?'selected':''}>–</option>${opts}</select>`;
+}
+
+// One-time rewrite of stored labels to keys, across plans, the exercise
+// library and every past session, so history and plans agree.
+function migrateMuscles(st){
+  if(st.schema>=2) return false;
+  let touched=0;
+  const fix=list=>(list||[]).forEach(e=>{
+    if(!e||e.muscle==null) return;
+    const k=muscleKey(e.muscle);
+    if(k!==e.muscle){ e.muscle=k; touched++; }
+  });
+  (st.plans||[]).forEach(p=>fix(p.exercises));
+  fix(st.globalExercises);
+  (st.history||[]).forEach(h=>fix(h.exercises));
+  st.schema=2;
+  return touched>0;
 }
 
 // ══════════════════════════════════════════════
@@ -862,7 +936,7 @@ function defaultState(){
   // No preset plan: a new install starts empty and the user builds their own.
   // Shipping a sample plan meant every stranger found someone else's
   // exercises, weights and machine settings waiting for them.
-  return { globalPauseSecs:75, lang:'en', activePlanId:null,
+  return { schema:2, globalPauseSecs:75, lang:'en', activePlanId:null,
     plans:[], globalExercises:[], progress:{}, history:[] };
 }
 
@@ -873,6 +947,7 @@ function loadState(){
 function saveState(){ localStorage.setItem('tp4_state', JSON.stringify(state)); }
 
 let state = loadState();
+if(migrateMuscles(state)) saveState();
 let lang = state.lang || 'en';
 
 // Locales whose date/time formats the desktop importer can still parse when an
@@ -1178,7 +1253,7 @@ function exItemHTML(planExercise){
   if(ex.type==='reps') for(let i=0;i<ex.sets;i++) dots+=`<div class="dot ${i<ds?'done':''}"></div>`;
   return `<div class="exercise-item ${done?'done':''}" onclick="openDetail('${ex.id}')">
     <div class="ex-icon">${ex.icon}</div>
-    <div class="ex-info"><div class="ex-muscle">${ex.muscle}</div><div class="ex-name">${ex.name}</div><div class="ex-meta">${metaStr(ex)}</div>${ex.type==='reps'?`<div class="ex-dots">${dots}</div>`:''}</div>
+    <div class="ex-info"><div class="ex-muscle">${muscleLabel(ex.muscle)}</div><div class="ex-name">${ex.name}</div><div class="ex-meta">${metaStr(ex)}</div>${ex.type==='reps'?`<div class="ex-dots">${dots}</div>`:''}</div>
     <div class="ex-arrow">${done?'✓':'›'}</div>
   </div>`;
 }
@@ -1203,7 +1278,7 @@ let currentExId=null;
 function openDetail(exId){
   currentExId=exId; const ex=getEx(exId);
   document.getElementById('d-name').textContent=ex.name;
-  document.getElementById('d-muscle').textContent=ex.muscle+' – '+(ex.type==='time'?t('time-ex'):t('strength-ex'));
+  document.getElementById('d-muscle').textContent=muscleLabel(ex.muscle)+' – '+(ex.type==='time'?t('time-ex'):t('strength-ex'));
   const grid=document.getElementById('d-info');
   if(ex.type==='time'){
     grid.innerHTML=`<div class="info-box" style="grid-column:1/-1"><div class="ib-label">${t('field.duration')}</div><div class="ib-val">${ex.durationMin||'5'}</div><div class="ib-sub">${t('min.abbr')}</div></div>`;
@@ -1479,7 +1554,7 @@ function showNextExerciseBanner(nextExId){
       <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:3px">${t('next.exercise')}</div>
       ${phaseLabel}
       <div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nextEx.icon} ${nextEx.name}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px">${nextEx.muscle} · ${metaStr(nextEx)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">${muscleLabel(nextEx.muscle)} · ${metaStr(nextEx)}</div>
     </div>
     <div style="color:var(--accent);font-size:22px;flex-shrink:0">›</div>
   </div>`;
@@ -1647,7 +1722,7 @@ function renderPlanExercises(){
       <div class="drag-handle" id="dh-${ex.id}">⠿</div>
       <div class="plan-ex-info">
         <div class="plan-ex-name">${ex.icon} ${ex.name}</div>
-        <div class="plan-ex-meta">${ex.muscle}${phase?' · '+phase.name:''} · ${metaStr(ex)}</div>
+        <div class="plan-ex-meta">${muscleLabel(ex.muscle)}${phase?' · '+phase.name:''} · ${metaStr(ex)}</div>
       </div>
       <div class="plan-ex-btns">
         <select class="pe-select" onchange="changeExPhase('${ex.id}',this.value)">${phaseOpts}</select>
@@ -1748,7 +1823,7 @@ function renderGexList(){
   list.innerHTML=state.globalExercises.map(gex=>`
     <div class="gex-item" id="gex-${gex.id}">
       <div class="gex-header" onclick="toggleGex('${gex.id}')">
-        <div class="gex-title"><span>${gex.icon}</span><span>${gex.name}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${gex.muscle}</span></div>
+        <div class="gex-title"><span>${gex.icon}</span><span>${gex.name}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${muscleLabel(gex.muscle)}</span></div>
         <div style="display:flex;align-items:center;gap:4px">
           <span style="font-size:10px;color:var(--muted)">${gex.type==='time'?t('type.time.abbr'):t('type.reps.abbr')}</span>
           <button class="del-btn" onclick="event.stopPropagation();deleteGex('${gex.id}')">✕</button>
@@ -1830,7 +1905,7 @@ function openAddExToPlan(){
     list.innerHTML=state.globalExercises.map(gex=>`
       <div class="gex-item" style="margin-bottom:6px;cursor:pointer" onclick="pickGex('${gex.id}')">
         <div class="gex-header" style="pointer-events:none">
-          <div class="gex-title"><span>${gex.icon}</span><span>${gex.name}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${gex.muscle}</span></div>
+          <div class="gex-title"><span>${gex.icon}</span><span>${gex.name}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${muscleLabel(gex.muscle)}</span></div>
           <div style="font-size:11px;color:var(--muted)">${metaStr(gex)}</div>
         </div>
       </div>`).join('');
@@ -2006,6 +2081,7 @@ function importData(event){
       const imported=JSON.parse(e.target.result);
       if(!Array.isArray(imported.plans)||!('activePlanId' in imported)) throw new Error('invalid');
       Object.assign(state,imported);
+      migrateMuscles(state);          // an older export still holds labels
       lang=state.lang||'en';
       saveState(); location.reload();
     } catch(err){ alert(t('import.error')); }
@@ -2255,7 +2331,7 @@ function openHistoryDetail(entryId){
     const meta=ex.type==='time'?(ex.durationMin||'?')+' '+t('min.abbr'):(ex.setsCompleted||0)+'/'+ex.sets+' '+t('field.sets').toLowerCase()+(ex.reps?' · '+ex.reps+' '+t('reps.abbr'):'')+(ex.kg?' · '+ex.kg+'kg':'');
     return `<div class="hd-ex-row">
       <div class="hd-ex-icon">${ex.icon}</div>
-      <div class="hd-ex-info"><div class="hd-ex-name">${ex.name}</div><div class="hd-ex-meta">${ex.muscle} · ${meta}</div></div>
+      <div class="hd-ex-info"><div class="hd-ex-name">${ex.name}</div><div class="hd-ex-meta">${muscleLabel(ex.muscle)} · ${meta}</div></div>
       <div class="hd-ex-status">${statusIcon}</div>
     </div>`;
   }).join('');
