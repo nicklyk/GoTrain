@@ -1701,6 +1701,80 @@ function deletePhase(phaseId){
 // PLAN EXERCISE EDITOR  (touch drag & drop)
 // ══════════════════════════════════════════════
 let dragSrcId=null, touchDragEl=null, touchDragClone=null, touchDragStartY=0, touchDragTargetId=null;
+let dragPointerX=0, dragPointerY=0, dragScrollRAF=0;
+
+// The page scrolls, not a wrapper, and both drag paths call preventDefault to
+// stop the browser panning. Without this the list stays put while you drag, so
+// the only rows you can drop onto are the ones already on screen -- moving the
+// first exercise to the end was impossible.
+const DRAG_EDGE=90;        // px from a viewport edge where scrolling kicks in
+const DRAG_SPEED=14;       // px per frame at the very edge
+
+// Both edges of the viewport are covered by chrome -- a sticky header at the
+// top, a fixed nav bar at the bottom -- and those are exactly the bands the
+// auto-scroll lives in. elementFromPoint there returns the chrome, not a row,
+// so the drop target is resolved against the content band between them: hold
+// at the bottom edge and the row just above the nav stays the target.
+function dragContentBand(){
+  const header=document.querySelector('.header');
+  const nav=document.querySelector('.bottom-nav');
+  const top=header?header.getBoundingClientRect().bottom:0;
+  const bottom=nav?nav.getBoundingClientRect().top:window.innerHeight;
+  return {top:top+4, bottom:Math.max(top+4, bottom-4)};
+}
+
+// Nearest row by vertical distance, for when the pointer is not over one:
+// the gaps between rows, the add button, or the 120px of padding below the
+// list. Without this, holding at the bottom of a fully scrolled list targets
+// nothing, because the last row is never the element under the finger.
+function dragNearestRow(y){
+  let best=null, bestDist=Infinity;
+  document.querySelectorAll('.plan-ex-row').forEach(r=>{
+    const b=r.getBoundingClientRect();
+    const d = y<b.top ? b.top-y : (y>b.bottom ? y-b.bottom : 0);
+    if(d<bestDist){ bestDist=d; best=r; }
+  });
+  return best;
+}
+
+function dragHoverAt(x,y){
+  const band=dragContentBand();
+  y=Math.min(Math.max(y,band.top),band.bottom);
+  const el=document.elementFromPoint(x,y);
+  let row=el&&el.closest?el.closest('.plan-ex-row'):null;
+  if(!row) row=dragNearestRow(y);
+  document.querySelectorAll('.plan-ex-row').forEach(r=>r.classList.remove('drag-over'));
+  if(row&&row.id!=='per-'+dragSrcId){
+    row.classList.add('drag-over');
+    touchDragTargetId=row.id.replace('per-','');
+  } else touchDragTargetId=null;
+}
+
+function dragScrollStep(){
+  dragScrollRAF=0;
+  if(!dragSrcId) return;
+  const h=window.innerHeight;
+  let dy=0;
+  if(dragPointerY<DRAG_EDGE) dy=-DRAG_SPEED*(1-dragPointerY/DRAG_EDGE);
+  else if(dragPointerY>h-DRAG_EDGE) dy=DRAG_SPEED*(1-(h-dragPointerY)/DRAG_EDGE);
+  if(dy){
+    const before=window.scrollY;
+    window.scrollBy(0,dy);
+    // Re-resolve the row under the finger: the content moved, not the pointer.
+    if(window.scrollY!==before) dragHoverAt(dragPointerX,dragPointerY);
+  }
+  if(dragSrcId) dragScrollRAF=requestAnimationFrame(dragScrollStep);
+}
+
+function dragTrack(x,y){
+  dragPointerX=x; dragPointerY=y;
+  if(!dragScrollRAF) dragScrollRAF=requestAnimationFrame(dragScrollStep);
+}
+
+function dragStopScroll(){
+  if(dragScrollRAF) cancelAnimationFrame(dragScrollRAF);
+  dragScrollRAF=0;
+}
 
 function renderPlanExercises(){
   const plan=getPlanById(editingPlanId), cont=document.getElementById('ptab-exercises'); let h='';
@@ -1739,15 +1813,13 @@ function mouseDragStart(e,id){
 }
 function mouseDragMove(e){
   if(!dragSrcId)return;
-  const el=document.elementFromPoint(e.clientX,e.clientY);
-  const row=el?.closest('.plan-ex-row');
-  document.querySelectorAll('.plan-ex-row').forEach(r=>r.classList.remove('drag-over'));
-  if(row&&row.id!=='per-'+dragSrcId){ row.classList.add('drag-over'); touchDragTargetId=row.id.replace('per-',''); }
-  else touchDragTargetId=null;
+  dragTrack(e.clientX,e.clientY);
+  dragHoverAt(e.clientX,e.clientY);
 }
 function mouseDragEnd(){
   document.removeEventListener('mousemove',mouseDragMove);
   document.removeEventListener('mouseup',mouseDragEnd);
+  dragStopScroll();
   if(dragSrcId&&touchDragTargetId) doReorder(dragSrcId,touchDragTargetId);
   document.querySelectorAll('.plan-ex-row').forEach(r=>r.classList.remove('dragging','drag-over'));
   dragSrcId=null; touchDragTargetId=null;
@@ -1765,15 +1837,13 @@ function touchDragStart(e,id){
 function touchDragMove(e){
   e.preventDefault(); if(!dragSrcId) return;
   const touch=e.touches[0];
-  const el=document.elementFromPoint(touch.clientX,touch.clientY);
-  const row=el?.closest('.plan-ex-row');
-  document.querySelectorAll('.plan-ex-row').forEach(r=>r.classList.remove('drag-over'));
-  if(row&&row.id!=='per-'+dragSrcId){ row.classList.add('drag-over'); touchDragTargetId=row.id.replace('per-',''); }
-  else touchDragTargetId=null;
+  dragTrack(touch.clientX,touch.clientY);
+  dragHoverAt(touch.clientX,touch.clientY);
 }
 function touchDragEnd(){
   document.removeEventListener('touchmove',touchDragMove);
   document.removeEventListener('touchend',touchDragEnd);
+  dragStopScroll();
   if(dragSrcId&&touchDragTargetId) doReorder(dragSrcId,touchDragTargetId);
   document.querySelectorAll('.plan-ex-row').forEach(r=>r.classList.remove('dragging','drag-over'));
   dragSrcId=null; touchDragTargetId=null;
