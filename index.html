@@ -248,6 +248,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .g-row:last-child{border-bottom:none}
 .g-lbl{font-size:14px;font-weight:500}
 .g-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.app-version{font-size:11px;color:var(--muted);text-align:center;margin-top:22px;line-height:1.6}
 .g-val{background:var(--surface2);border:1.5px solid #3a3a45;border-radius:10px;color:var(--text);font-family:var(--font-body);font-size:15px;padding:8px 10px;width:80px;text-align:center;outline:none;-webkit-appearance:none;appearance:none}
 .g-val:focus{border-color:var(--accent)}
 .g-val.wide{width:130px;text-align:left}
@@ -456,6 +457,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <button class="btn-outline" id="btn-new-workout" onclick="newWorkout()"></button>
       <button class="btn-danger" id="btn-reset-all" onclick="confirmResetAll()"></button>
     </div>
+    <div class="app-version" id="app-version"></div>
   </div>
 </div>
 
@@ -693,6 +695,7 @@ const T = {
     'btn.export':'Exportieren','btn.import':'Importieren',
     'btn.sync.qr':'PC-Code scannen',
     'data.hint':'Exportieren speichert eine Sicherung auf dem Gerät. Zum Übertragen an den PC die Datei anschließend z. B. mit LocalSend teilen.',
+    'about.cache':'Offline-Cache',
     'sync.scanning':'Richte die Kamera auf den QR-Code auf deinem PC',
     'sync.confirm':'{n} Workouts an {host} senden?\n\nDie Übertragung läuft unverschlüsselt über dein WLAN.',
     'sync.nothing':'Nichts Neues zu senden — dein PC ist auf dem aktuellen Stand.',
@@ -774,6 +777,7 @@ const T = {
     'btn.export':'Export','btn.import':'Import',
     'btn.sync.qr':'Scan PC code',
     'data.hint':'Export saves a backup on this device. To move it to your PC, share that file afterwards — with LocalSend, for example.',
+    'about.cache':'Offline cache',
     'sync.scanning':'Point the camera at the QR code on your PC',
     'sync.confirm':'Send {n} workouts to {host}?\n\nThe transfer is unencrypted over your local network.',
     'sync.nothing':'Nothing new to send — your PC is already up to date.',
@@ -846,6 +850,34 @@ const T = {
     'timer.done.notification':'Time is up – complete the exercise now!',
   }
 };
+// Bumped together with CACHE_NAME in sw.js. The number shown here comes from
+// index.html, so it reports the build actually running -- an old page served
+// from a stale cache reports its own old number, which is the point.
+const APP_VERSION='13';
+const APP_BUILD='2026-09-19';
+
+// The service worker's cache name is the ground truth for what is installed.
+// Showing it alongside makes the "new build, second launch" state legible
+// instead of leaving you guessing whether an update landed.
+// The version goes up synchronously; the cache name is appended only once the
+// lookup answers. caches.keys() is unavailable under file:// and can hang
+// rather than reject, so awaiting it before writing anything would leave the
+// line permanently blank -- which is the one thing this display must not do.
+function renderVersion(){
+  const el=document.getElementById('app-version'); if(!el) return;
+  el.textContent='GoTrain v'+APP_VERSION+' \u00b7 '+APP_BUILD;
+  try{
+    if(!window.caches) return;
+    caches.keys().then(keys=>{
+      const hit=keys.filter(k=>k.indexOf('gotrain-')===0).sort().pop();
+      if(!hit) return;
+      const line=document.createElement('div');
+      line.textContent=t('about.cache')+': '+hit;
+      el.appendChild(line);
+    }).catch(()=>{});
+  }catch(e){}
+}
+
 // English is the app default, so it is also what a missing string falls back
 // to. This used to fall back to German, which is how German text surfaced in
 // an otherwise English UI.
@@ -1019,6 +1051,7 @@ function applyTranslations(){
   document.getElementById('h-plan-name').textContent = 'GOTRAIN';
   document.getElementById('h-sub').textContent = '';
   syncHeaderOffset();
+  renderVersion();
 }
 
 function changeLang(l){
