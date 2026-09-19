@@ -140,8 +140,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
    controls -- body alone is not reliably enough. Needs iOS 16+, and even
    there Safari may still bounce the content while keeping fixed and sticky
    elements put, which is the part that actually looked wrong. */
-html{background:var(--surface);overscroll-behavior:none}
-body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+html,body{height:100%;overflow:hidden}
+html{background:var(--surface)}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+/* The single scroll container. overscroll-behavior works here -- it is honoured
+   on element scrollers on iOS, unlike on the document -- so reaching either end
+   stops dead instead of dragging the whole page and exposing the backdrop. */
+#app-scroll{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .header{background:var(--surface);padding:52px 16px 12px;border-bottom:1px solid #2a2a33;position:sticky;top:0;z-index:100}
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .header-top h1{font-family:var(--font-display);font-size:22px;letter-spacing:2px;color:var(--accent);line-height:1}
@@ -380,6 +386,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 </head>
 <body>
 
+<!-- Everything that scrolls lives in #app-scroll. The document itself does
+     not scroll at all, which is the only way to stop iOS rubber-banding the
+     page away from under the header: overscroll-behavior is ignored on the
+     document scroller there. The fixed chrome -- bottom nav, timer, modals,
+     scanner -- stays outside it. -->
+<div id="app-scroll">
+
 <div class="header">
   <div class="header-top">
     <div><h1 id="h-plan-name">GOTRAIN</h1><p id="h-sub"></p></div>
@@ -486,6 +499,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="sec-label" id="hd-ex-label"></div>
   <div id="hd-exercises"></div>
 </div>
+
+</div><!-- /#app-scroll -->
 
 <!-- MODAL: SELECT PLAN TO START -->
 <div class="modal-overlay" id="modalSelectPlan">
@@ -853,7 +868,7 @@ const T = {
 // Bumped together with CACHE_NAME in sw.js. The number shown here comes from
 // index.html, so it reports the build actually running -- an old page served
 // from a stale cache reports its own old number, which is the point.
-const APP_VERSION='13';
+const APP_VERSION='14';
 const APP_BUILD='2026-09-19';
 
 // The service worker's cache name is the ground truth for what is installed.
@@ -1248,7 +1263,7 @@ function abortWorkout(){
   document.getElementById('timerOverlay').classList.remove('active');
   workoutMode='home';
   renderWorkout();
-  window.scrollTo(0,0);
+  appScroll().scrollTo(0,0);
 }
 
 function startWithPlan(planId){
@@ -1269,7 +1284,7 @@ function finishWorkout(){
   clearInterval(wuInt); wuRunning=false; swStopAll(); onWorkoutEnded();
   workoutMode='home';
   renderWorkout();
-  window.scrollTo(0,0);
+  appScroll().scrollTo(0,0);
 }
 
 function openPlanSelectModal(){
@@ -1812,18 +1827,23 @@ function dragHoverAt(x,y){
   } else touchDragTargetId=null;
 }
 
+// #app-scroll is the scroller now, so the drag auto-scroll drives it rather
+// than the window -- window.scrollBy would move nothing at all.
+function appScroll(){ return document.getElementById('app-scroll'); }
+
 function dragScrollStep(){
   dragScrollRAF=0;
   if(!dragSrcId) return;
-  const h=window.innerHeight;
+  const sc=appScroll(); if(!sc) return;
+  const h=sc.clientHeight;
   let dy=0;
   if(dragPointerY<DRAG_EDGE) dy=-DRAG_SPEED*(1-dragPointerY/DRAG_EDGE);
   else if(dragPointerY>h-DRAG_EDGE) dy=DRAG_SPEED*(1-(h-dragPointerY)/DRAG_EDGE);
   if(dy){
-    const before=window.scrollY;
-    window.scrollBy(0,dy);
+    const before=sc.scrollTop;
+    sc.scrollTop=before+dy;
     // Re-resolve the row under the finger: the content moved, not the pointer.
-    if(window.scrollY!==before) dragHoverAt(dragPointerX,dragPointerY);
+    if(sc.scrollTop!==before) dragHoverAt(dragPointerX,dragPointerY);
   }
   if(dragSrcId) dragScrollRAF=requestAnimationFrame(dragScrollStep);
 }
@@ -2370,7 +2390,7 @@ function newWorkout(){
   if(hasProgress) saveHistory();
   state.progress[state.activePlanId]=emptyProgress();
   saveState();clearInterval(wuInt);wuRunning=false;swStopAll();
-  workoutMode='home'; showScreen('workout');window.scrollTo(0,0);
+  workoutMode='home'; showScreen('workout');appScroll().scrollTo(0,0);
 }
 function confirmResetAll(){ if(!confirm(t('confirm.reset-all')))return; localStorage.removeItem('tp4_state');location.reload(); }
 
