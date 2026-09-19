@@ -146,9 +146,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 /* The single scroll container. overscroll-behavior works here -- it is honoured
    on element scrollers on iOS, unlike on the document -- so reaching either end
    stops dead instead of dragging the whole page and exposing the backdrop. */
+/* No -webkit-overflow-scrolling:touch -- it is what breaks position:sticky
+   inside a scroll container on iOS, and the plan editor's header needs
+   sticky to keep working. Momentum scrolling is the default there anyway. */
 #app-scroll{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;
-  overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.header{background:var(--surface);padding:52px 16px 12px;border-bottom:1px solid #2a2a33;position:sticky;top:0;z-index:100}
+  overscroll-behavior:contain}
+/* A spacer, not padding on the scroller: browsers disagree on whether a
+   sticky offset is measured from the scroller's padding box or its content
+   box, and padding here shifted the plan editor's sticky header down by the
+   header's height a second time. A spacer keeps that arithmetic out of it.
+   --header-h is measured at runtime, since the header's height moves with
+   the font scale. */
+.header-spacer{height:var(--header-h,110px)}
+.header{background:var(--surface);padding:52px 16px 12px;border-bottom:1px solid #2a2a33;position:fixed;top:0;left:0;right:0;z-index:100}
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .header-top h1{font-family:var(--font-display);font-size:22px;letter-spacing:2px;color:var(--accent);line-height:1}
 .header-top p{font-size:11px;color:var(--muted);margin-top:1px}
@@ -386,13 +396,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 </head>
 <body>
 
-<!-- Everything that scrolls lives in #app-scroll. The document itself does
-     not scroll at all, which is the only way to stop iOS rubber-banding the
-     page away from under the header: overscroll-behavior is ignored on the
-     document scroller there. The fixed chrome -- bottom nav, timer, modals,
-     scanner -- stays outside it. -->
-<div id="app-scroll">
-
+<!-- The header sits outside the scroller and is simply fixed. It used to be
+     position:sticky, which held while the document was the scroller but
+     failed once the scroller became an element: iOS scrolled it away with
+     the content on every screen that was long enough to scroll. Fixed
+     chrome does not depend on sticky working inside a container at all. -->
 <div class="header">
   <div class="header-top">
     <div><h1 id="h-plan-name">GOTRAIN</h1><p id="h-sub"></p></div>
@@ -405,6 +413,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
     </div>
   </div>
 </div>
+
+<!-- Everything that scrolls lives in #app-scroll. The document itself does
+     not scroll at all, which is the only way to stop iOS rubber-banding the
+     page away from under the header: overscroll-behavior is ignored on the
+     document scroller there. The fixed chrome -- header, bottom nav, timer,
+     modals, scanner -- stays outside it. -->
+<div id="app-scroll">
+<div class="header-spacer"></div>
 
 <div id="screen-workout" class="screen active"><div id="workout-content"></div></div>
 
@@ -868,7 +884,7 @@ const T = {
 // Bumped together with CACHE_NAME in sw.js. The number shown here comes from
 // index.html, so it reports the build actually running -- an old page served
 // from a stale cache reports its own old number, which is the point.
-const APP_VERSION='14';
+const APP_VERSION='15';
 const APP_BUILD='2026-09-19';
 
 // The service worker's cache name is the ground truth for what is installed.
