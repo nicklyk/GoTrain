@@ -435,9 +435,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       </div>
       <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
       <div class="io-row">
-        <div class="io-btn" id="btn-sync-share" onclick="syncShare()"><span>📲</span><span data-i="btn.sync.share"></span></div>
         <div class="io-btn" id="btn-sync-qr" onclick="syncScan()"><span>🔳</span><span data-i="btn.sync.qr"></span></div>
       </div>
+      <div class="g-sub" style="margin-top:10px" data-i="data.hint"></div>
     </div>
     <div class="sec-label" data-i="section.workout"></div>
     <div class="card" style="padding:12px 16px">
@@ -680,15 +680,14 @@ const T = {
     'gs.trainer.lbl':'Trainer','gs.trainer.sub':'Kopfzeile',
     'gs.lang.lbl':'Sprache','gs.lang.sub':'App-Sprache',
     'btn.export':'Exportieren','btn.import':'Importieren',
-    'btn.sync.share':'An PC senden','btn.sync.qr':'PC-Code scannen',
+    'btn.sync.qr':'PC-Code scannen',
+    'data.hint':'Exportieren speichert eine Sicherung auf dem Gerät. Zum Übertragen an den PC die Datei anschließend z. B. mit LocalSend teilen.',
     'sync.scanning':'Richte die Kamera auf den QR-Code auf deinem PC',
     'sync.confirm':'{n} Workouts an {host} senden?\n\nDie Übertragung läuft unverschlüsselt über dein WLAN.',
-    'sync.sending':'Wird gesendet…',
     'sync.nothing':'Nichts Neues zu senden — dein PC ist auf dem aktuellen Stand.',
     'sync.warn.empty':'Diese App enthält noch keine Workouts. Trotzdem senden?',
     'sync.err.cam':'Kein Kamerazugriff. Erlaube den Zugriff in den Einstellungen oder nutze „An PC senden".',
     'sync.err.code':'Das ist kein GoTrain-Pairing-Code.',
-    'sync.err.share':'Teilen wird auf diesem Gerät nicht unterstützt — nutze stattdessen Exportieren.',
     'sync.err.toobig':'Zu viele Daten für die Übertragung per QR-Code. Nutze „An PC senden".',
     'btn.new-workout':'⟳ NEUES WORKOUT STARTEN','btn.reset-all':'Alle Daten löschen',
     'btn.new-plan':'+ NEUEN PLAN ERSTELLEN','btn.new-gex':'+ NEUE ÜBUNG DEFINIEREN',
@@ -734,7 +733,7 @@ const T = {
     'confirm.del-gex':'Übung aus Bibliothek löschen?',
     'alert.last-plan':'Letzten Plan kann man nicht löschen.',
     'alert.no-name':'Bitte Name eingeben.',
-    'export.filename':'trainingsplan_export.json',
+    
     'import.success':'Daten erfolgreich importiert!','import.error':'Ungültige Datei.',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
     'history.plan':'Plan','history.time':'Uhrzeit','history.sets':'Sätze',
@@ -767,15 +766,14 @@ const T = {
     'gs.trainer.lbl':'Trainer','gs.trainer.sub':'Header line',
     'gs.lang.lbl':'Language','gs.lang.sub':'App language',
     'btn.export':'Export','btn.import':'Import',
-    'btn.sync.share':'Send to PC','btn.sync.qr':'Scan PC code',
+    'btn.sync.qr':'Scan PC code',
+    'data.hint':'Export saves a backup on this device. To move it to your PC, share that file afterwards — with LocalSend, for example.',
     'sync.scanning':'Point the camera at the QR code on your PC',
     'sync.confirm':'Send {n} workouts to {host}?\n\nThe transfer is unencrypted over your local network.',
-    'sync.sending':'Sending…',
     'sync.nothing':'Nothing new to send — your PC is already up to date.',
     'sync.warn.empty':'This app has no workouts recorded yet. Send anyway?',
     'sync.err.cam':'No camera access. Allow it in settings, or use "Send to PC" instead.',
     'sync.err.code':'That is not a GoTrain pairing code.',
-    'sync.err.share':'Sharing is not supported on this device — use Export instead.',
     'sync.err.toobig':'Too much data to transfer by QR code. Use "Send to PC" instead.',
     'btn.new-workout':'⟳ START NEW WORKOUT','btn.reset-all':'Delete all data',
     'btn.new-plan':'+ CREATE NEW PLAN','btn.new-gex':'+ DEFINE NEW EXERCISE',
@@ -821,7 +819,7 @@ const T = {
     'confirm.del-gex':'Delete exercise from library?',
     'alert.last-plan':'Cannot delete the last plan.',
     'alert.no-name':'Please enter a name.',
-    'export.filename':'workout_plan_export.json',
+    
     'import.success':'Data imported successfully!','import.error':'Invalid file.',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
     'history.plan':'Plan','history.time':'Time','history.sets':'Sets',
@@ -2067,12 +2065,20 @@ function deletePlanById(planId){ if(state.plans.length<=1){alert(t('alert.last-p
 // EXPORT / IMPORT
 // ══════════════════════════════════════════════
 function exportData(){
+  // Warn before writing out what looks like a fresh install: on iOS the
+  // home screen app and Safari keep separate storage, and an empty-looking
+  // state usually means the wrong one is open.
+  if(syncLooksEmpty() && !confirm(t('sync.warn.empty'))) return;
   const json=JSON.stringify(state,null,2);
   const blob=new Blob([json],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download=t('export.filename'); a.click();
+  // Date-stamped, so repeated exports sit side by side instead of
+  // overwriting each other and the desktop can tell which is newest.
+  const a=document.createElement('a'); a.href=url; a.download=exportFilename(); a.click();
   URL.revokeObjectURL(url);
 }
+
+function exportFilename(){ return 'gotrain-'+new Date().toISOString().slice(0,10)+'.json'; }
 function triggerImport(){ document.getElementById('import-file').click(); }
 function importData(event){
   const file=event.target.files[0]; if(!file) return;
@@ -2104,8 +2110,6 @@ function importData(event){
 // A plain fetch() to http://192.168.x.x is blocked as mixed content from this
 // HTTPS page, and iOS has no Local Network Access to relax it. Navigation is
 // not subject to that rule, which is why the QR route leaves the page.
-
-function syncFilename(){ return 'gotrain-'+new Date().toISOString().slice(0,10)+'.json'; }
 
 // A state that still looks like defaultState() usually means the app was
 // opened in a different storage container than the one holding the real
@@ -2165,17 +2169,6 @@ function sortKeys(v){
 }
 
 // ---- Route 1: the share sheet ---------------------------------------------
-async function syncShare(){
-  if(syncLooksEmpty() && !confirm(t('sync.warn.empty'))) return;
-  const json=JSON.stringify(state,null,2);
-  const file=new File([json],syncFilename(),{type:'application/json'});
-  if(!navigator.canShare || !navigator.canShare({files:[file]})){
-    alert(t('sync.err.share')); return;
-  }
-  try{ await navigator.share({files:[file]}); }
-  catch(err){ if(err && err.name!=='AbortError') alert(t('sync.err.share')); }
-}
-
 // ---- Route 2: scan the PC's pairing code -----------------------------------
 let scanStream=null, scanRAF=0, scanCanvas=null;
 
