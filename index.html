@@ -176,6 +176,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .btn-outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent);border-radius:var(--radius);font-family:var(--font-display);font-size:17px;letter-spacing:2px;padding:13px 20px;width:100%;cursor:pointer;margin-top:6px}
 .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);border-radius:var(--radius);font-size:13px;font-weight:600;padding:10px 16px;cursor:pointer;margin-top:8px;width:100%}
 .detail-header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+/* Plan editor only: the back button and plan name stay put while the list
+   scrolls, including the auto-scroll during a drag. --header-h is measured
+   from the global header at runtime, since its height depends on the font
+   scale. The negative margins let the background bleed across the screen's
+   16px padding so rows do not show through at the edges. */
+#screen-plan-detail .detail-header{position:sticky;top:var(--header-h,110px);z-index:90;
+  background:var(--bg);margin:0 -16px 10px;padding:10px 16px}
 .back-btn{background:var(--surface);border:1px solid #2a2a33;color:var(--text);border-radius:12px;width:40px;height:40px;min-width:40px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
 .detail-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;line-height:1.1}
 .detail-sub{font-size:11px;color:var(--muted);margin-top:2px}
@@ -959,6 +966,15 @@ function entryTime(e){
 // ══════════════════════════════════════════════
 // i18n RENDERING
 // ══════════════════════════════════════════════
+// The global header is sticky at top:0; anything that wants to sit directly
+// under it needs its height, which varies with the font scale.
+function syncHeaderOffset(){
+  const h=document.querySelector('.header');
+  document.documentElement.style.setProperty('--header-h',(h?h.offsetHeight:0)+'px');
+}
+window.addEventListener('resize',syncHeaderOffset);
+window.addEventListener('orientationchange',syncHeaderOffset);
+
 function applyTranslations(){
   document.documentElement.lang = lang;
   document.querySelectorAll('[data-i]').forEach(el=>{
@@ -997,6 +1013,7 @@ function applyTranslations(){
   document.getElementById('hd-ex-label').textContent = t('history.detail.exercises');
   document.getElementById('h-plan-name').textContent = 'GOTRAIN';
   document.getElementById('h-sub').textContent = '';
+  syncHeaderOffset();
 }
 
 function changeLang(l){
@@ -1087,11 +1104,13 @@ function showSettingsTab(tab){
 function updateHeader(){
   document.getElementById('h-plan-name').textContent = 'GOTRAIN';
   document.getElementById('h-sub').textContent = '';
+  syncHeaderOffset();
 }
 
 function setWorkoutHeader(planName){
   document.getElementById('h-plan-name').textContent = planName.toUpperCase();
   document.getElementById('h-sub').textContent = '🟢 ' + t('workout.active.banner.title');
+  syncHeaderOffset();
 }
 
 // Keep renderPlanSwitcher as no-op since element was removed from HTML
@@ -1716,9 +1735,14 @@ const DRAG_SPEED=14;       // px per frame at the very edge
 // so the drop target is resolved against the content band between them: hold
 // at the bottom edge and the row just above the nav stays the target.
 function dragContentBand(){
-  const header=document.querySelector('.header');
   const nav=document.querySelector('.bottom-nav');
-  const top=header?header.getBoundingClientRect().bottom:0;
+  // Whichever sticky bar reaches furthest down is what the band has to clear:
+  // the plan editor pins its own header under the global one, and a row lying
+  // beneath either of them must not become the drop target.
+  let top=0;
+  document.querySelectorAll('.header, #screen-plan-detail.screen.active .detail-header')
+    .forEach(el=>{ const r=el.getBoundingClientRect();
+      if(r.height>0) top=Math.max(top,r.bottom); });
   const bottom=nav?nav.getBoundingClientRect().top:window.innerHeight;
   return {top:top+4, bottom:Math.max(top+4, bottom-4)};
 }
