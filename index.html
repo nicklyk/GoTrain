@@ -941,11 +941,14 @@ const T = {
     'timer.done.notification':'Time is up – complete the exercise now!',
   }
 };
-// Bumped together with CACHE_NAME in sw.js. The number shown here comes from
-// index.html, so it reports the build actually running -- an old page served
-// from a stale cache reports its own old number, which is the point.
-const APP_VERSION='19';
-const APP_BUILD='2026-09-19';
+// Three things move together on every shipped change, or the display lies:
+// APP_VERSION, APP_BUILD (the date it actually shipped), and CACHE_NAME in
+// sw.js -- without that last one the phone keeps serving the cached page and
+// never sees the other two. The number shown comes from index.html, so it
+// reports the build actually running: an old page served from a stale cache
+// reports its own old number, which is the point.
+const APP_VERSION='20';
+const APP_BUILD='2026-09-20';
 
 // The service worker's cache name is the ground truth for what is installed.
 // Showing it alongside makes the "new build, second launch" state legible
