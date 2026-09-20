@@ -337,12 +337,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .wheel-wrap{position:relative;display:flex;justify-content:center;align-items:stretch;gap:4px;height:170px}
 .wheel-wrap.dim{opacity:.28;pointer-events:none}
 .wheel-band{position:absolute;left:0;right:0;top:68px;height:34px;border-radius:10px;background:var(--surface2);pointer-events:none}
-.wheel-col{height:170px;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none;text-align:right;min-width:50px;position:relative;z-index:1}
+/* The unit label sits on top of the column rather than beside it, and the
+   column's right padding runs underneath it. The digits do not move -- a 92px
+   group less 42px of padding leaves the same 50px they were right-aligned in
+   before -- but the strip where "min" and "sec" are printed now scrolls the
+   wheel instead of swallowing the touch. Without this you had to land almost
+   exactly on the number, while the left side had a comfortable 26px margin. */
+.wheel-group{position:relative;width:92px}
+.wheel-col{height:170px;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none;text-align:right;width:100%;padding-right:42px;position:relative;z-index:1}
 .wheel-col::-webkit-scrollbar{display:none}
 .wheel-pad{height:68px}
 .wheel-item{height:34px;line-height:34px;font-size:20px;font-weight:600;scroll-snap-align:center;font-variant-numeric:tabular-nums;color:var(--muted);transition:color .12s}
 .wheel-item.sel{color:var(--accent)}
-.wheel-unit{align-self:center;font-size:12px;color:var(--muted);position:relative;z-index:1;min-width:38px;text-align:left;padding-left:2px}
+.wheel-unit{position:absolute;right:0;top:50%;transform:translateY(-50%);width:38px;pointer-events:none;font-size:12px;color:var(--muted);z-index:2;text-align:left;padding-left:2px}
 
 /* HISTORY */
 .h-card{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:16px;margin-bottom:10px}
@@ -700,10 +707,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
     </div>
     <div class="wheel-wrap" id="dur-wrap">
       <div class="wheel-band"></div>
-      <div class="wheel-col" id="dur-min"></div>
-      <div class="wheel-unit" data-i="unit.min"></div>
-      <div class="wheel-col" id="dur-sec"></div>
-      <div class="wheel-unit" data-i="unit.sec"></div>
+      <div class="wheel-group">
+        <div class="wheel-col" id="dur-min"></div>
+        <div class="wheel-unit" data-i="unit.min"></div>
+      </div>
+      <div class="wheel-group">
+        <div class="wheel-col" id="dur-sec"></div>
+        <div class="wheel-unit" data-i="unit.sec"></div>
+      </div>
     </div>
     <div class="modal-btns"><div class="m-btn accent" id="dur-save-btn" onclick="durConfirm()"></div></div>
     <div class="m-cancel" onclick="durCancel()" data-i="btn.cancel"></div>
@@ -929,7 +940,7 @@ const T = {
 // Bumped together with CACHE_NAME in sw.js. The number shown here comes from
 // index.html, so it reports the build actually running -- an old page served
 // from a stale cache reports its own old number, which is the point.
-const APP_VERSION='16';
+const APP_VERSION='17';
 const APP_BUILD='2026-09-19';
 
 // The service worker's cache name is the ground truth for what is installed.
