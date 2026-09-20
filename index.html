@@ -800,13 +800,12 @@ const T = {
     'muscle.legs':'Beine','muscle.neck':'Nacken','muscle.shoulders':'Schulter','muscle.triceps':'Trizeps',
     'field.sets':'Sätze','field.seatheight':'Sitzhöhe','field.weight':'Gewicht (kg)',
     'field.pause':'Pause','field.duration':'Dauer',
-    'unit.min':'Min.','unit.sec':'Sek.','unit.minsec':'Min:Sek.',
+    'unit.min':'Min.','unit.sec':'Sek.',
     'dur.default':'Standard','dur.usedefault':'Standard verwenden',
     'field.note':'Notiz','field.phase':'Phase',
     'type.reps':'💪 Sätze / Wdh.','type.time':'⏱ Zeitbasiert',
     'gex.desc':'Definiere Übungen einmalig. Beim Hinzufügen zu einem Plan können sie angepasst werden.',
     'planex.desc':'Aus globalen Übungen wählen oder neu erstellen:',
-    'plan.empty':'Leerer Plan','plan.copy':'Kopie des aktiven Plans',
     'btn.adjust':'✏️ Für heute anpassen','btn.adjust.edit':'✏️ Anpassung ändern',
     'btn.adjust.reset':'Auf Plan zurücksetzen','modal.adjust':'FÜR HEUTE ANPASSEN',
     'adjust.hint':'Gilt nur für dieses Training. Dein Plan bleibt unverändert.',
@@ -817,7 +816,7 @@ const T = {
     'no-phase':'Keine Phase','no-gex':'Noch keine globalen Übungen definiert.',
     'no-history':'Noch kein Training abgeschlossen.',
     'done':'✓ ABGESCHLOSSEN','complete':'ÜBUNG ABSCHLIESSEN ✓','undo':'↩ Rückgängig',
-    'set':'Satz','reps.abbr':'Wdh.','min.abbr':'Min.','seatheight.abbr':'Sitzhöhe',
+    'set':'Satz','reps.abbr':'Wdh.','seatheight.abbr':'Sitzhöhe',
     'timer.lbl':'PAUSE · NÄCHSTER SATZ IN','skip':'Überspringen',
     'time-ex':'Zeitübung','strength-ex':'Kraftübung',
     'timer':'TIMER','completed.min':'abgeschlossen',
@@ -884,13 +883,12 @@ const T = {
     'muscle.legs':'Legs','muscle.neck':'Neck','muscle.shoulders':'Shoulders','muscle.triceps':'Triceps',
     'field.sets':'Sets','field.seatheight':'Seat height','field.weight':'Weight (kg)',
     'field.pause':'Rest','field.duration':'Duration',
-    'unit.min':'min','unit.sec':'sec','unit.minsec':'min:sec',
+    'unit.min':'min','unit.sec':'sec',
     'dur.default':'Default','dur.usedefault':'Use the default',
     'field.note':'Note','field.phase':'Phase',
     'type.reps':'💪 Sets / Reps','type.time':'⏱ Time-based',
     'gex.desc':'Define exercises once here. They can be customized when added to a plan.',
     'planex.desc':'Choose from global exercises or create a new one:',
-    'plan.empty':'Empty plan','plan.copy':'Copy of active plan',
     'btn.adjust':'✏️ Adjust for today','btn.adjust.edit':'✏️ Change adjustment',
     'btn.adjust.reset':'Reset to plan','modal.adjust':'ADJUST FOR TODAY',
     'adjust.hint':'Applies to this session only. Your plan stays unchanged.',
@@ -901,7 +899,7 @@ const T = {
     'no-phase':'No phase','no-gex':'No global exercises defined yet.',
     'no-history':'No workout completed yet.',
     'done':'✓ COMPLETED','complete':'COMPLETE EXERCISE ✓','undo':'↩ Undo',
-    'set':'Set','reps.abbr':'reps','min.abbr':'min.','seatheight.abbr':'Seat',
+    'set':'Set','reps.abbr':'reps','seatheight.abbr':'Seat',
     'timer.lbl':'REST · NEXT SET IN','skip':'Skip',
     'time-ex':'Timed exercise','strength-ex':'Strength exercise',
     'timer':'TIMER','completed.min':'completed',
@@ -940,7 +938,7 @@ const T = {
 // Bumped together with CACHE_NAME in sw.js. The number shown here comes from
 // index.html, so it reports the build actually running -- an old page served
 // from a stale cache reports its own old number, which is the point.
-const APP_VERSION='17';
+const APP_VERSION='18';
 const APP_BUILD='2026-09-19';
 
 // The service worker's cache name is the ground truth for what is installed.
@@ -1324,7 +1322,7 @@ function openGlobalPausePicker(){
   }});
 }
 function metaStr(ex){
-  if(ex.type==='time') return fmtDur(exDurSecs(ex))+' '+t('unit.minsec');
+  if(ex.type==='time') return fmtDur(exDurSecs(ex))+' '+t('unit.min');
   const p=[]; if(ex.reps) p.push(ex.reps+' '+t('reps.abbr')); p.push(ex.sets+' '+t('field.sets'));
   if(ex.sithoehe) p.push(t('seatheight.abbr')+' '+ex.sithoehe); if(ex.kg) p.push(ex.kg+' kg');
   return p.join(' · ');
@@ -1552,13 +1550,13 @@ function openDetail(exId){
   document.getElementById('d-muscle').textContent=muscleLabel(ex.muscle)+' – '+(ex.type==='time'?t('time-ex'):t('strength-ex'));
   const grid=document.getElementById('d-info');
   if(ex.type==='time'){
-    grid.innerHTML=`<div class="info-box" style="grid-column:1/-1"><div class="ib-label">${t('field.duration')}</div><div class="ib-val">${fmtDur(exDurSecs(ex))}</div><div class="ib-sub">${t('unit.minsec')}</div></div>`;
+    grid.innerHTML=`<div class="info-box" style="grid-column:1/-1"><div class="ib-label">${t('field.duration')}</div><div class="ib-val">${fmtDur(exDurSecs(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
   } else {
     let h=`<div class="info-box"><div class="ib-label">${t('field.reps')}</div><div class="ib-val">${ex.reps||'–'}</div><div class="ib-sub">${t('reps.abbr')}</div></div>
       <div class="info-box"><div class="ib-label">${t('field.sets')}</div><div class="ib-val">${ex.sets}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>`;
     if(ex.sithoehe) h+=`<div class="info-box"><div class="ib-label">${t('field.seatheight')}</div><div class="ib-val">${ex.sithoehe}</div><div class="ib-sub">${t('seatheight.abbr')}</div></div>`;
     if(ex.kg) h+=`<div class="info-box"><div class="ib-label">${t('field.weight')}</div><div class="ib-val">${ex.kg}</div><div class="ib-sub">kg</div></div>`;
-    h+=`<div class="info-box"><div class="ib-label">${t('gs.pause.lbl')}</div><div class="ib-val">${fmtDur(pauseFor(ex))}</div><div class="ib-sub">${t('unit.minsec')}</div></div>`;
+    h+=`<div class="info-box"><div class="ib-label">${t('gs.pause.lbl')}</div><div class="ib-val">${fmtDur(pauseFor(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
     grid.innerHTML=h;
   }
   const noteEl=document.getElementById('d-note');
@@ -1603,7 +1601,7 @@ const ADJUST_FIELDS = {
     {key:'sets', label:'field.sets',   hint:'field.sets',    type:'number'}
   ],
   time: [
-    {key:'durationSecs', label:'field.duration', hint:'unit.minsec', type:'duration'}
+    {key:'durationSecs', label:'field.duration', hint:'unit.min', type:'duration'}
   ]
 };
 
@@ -2685,7 +2683,7 @@ function openHistoryDetail(entryId){
   const exList=entry.exercises||[];
   document.getElementById('hd-exercises').innerHTML=exList.map(ex=>{
     const statusIcon=ex.done?'✅':'⬜';
-    const meta=ex.type==='time'?(ex.durationSecs!=null?fmtDur(ex.durationSecs)+' '+t('unit.minsec'):(ex.durationMin||'?')+' '+t('min.abbr')):(ex.setsCompleted||0)+'/'+ex.sets+' '+t('field.sets').toLowerCase()+(ex.reps?' · '+ex.reps+' '+t('reps.abbr'):'')+(ex.kg?' · '+ex.kg+'kg':'');
+    const meta=ex.type==='time'?(ex.durationSecs!=null?fmtDur(ex.durationSecs)+' '+t('unit.min'):(ex.durationMin||'?')+' '+t('unit.min')):(ex.setsCompleted||0)+'/'+ex.sets+' '+t('field.sets').toLowerCase()+(ex.reps?' · '+ex.reps+' '+t('reps.abbr'):'')+(ex.kg?' · '+ex.kg+'kg':'');
     return `<div class="hd-ex-row">
       <div class="hd-ex-icon">${ex.icon}</div>
       <div class="hd-ex-info"><div class="hd-ex-name">${ex.name}</div><div class="hd-ex-meta">${muscleLabel(ex.muscle)} · ${meta}</div></div>
