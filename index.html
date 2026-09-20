@@ -820,6 +820,9 @@ const T = {
     'timer.lbl':'PAUSE · NÄCHSTER SATZ IN','skip':'Überspringen',
     'time-ex':'Zeitübung','strength-ex':'Kraftübung',
     'timer':'TIMER','completed.min':'abgeschlossen',
+    'timer.start':'START','timer.pause':'PAUSE','timer.resume':'WEITER',
+    'timer.again':'NOCHMAL','timer.finished':'FERTIG!',
+    'sw.start':'Start','sw.stop':'Stopp',
     'without-phase':'Weitere Übungen','without-phase-lbl':'Ohne Phase',
     'phase':'Phase','type.time.abbr':'⏱ Zeit','type.reps.abbr':'💪 Kraft',
     'edit.note':'Bearbeiten','mce.desc':'Änderungen gelten nur für diesen Plan.',
@@ -903,6 +906,9 @@ const T = {
     'timer.lbl':'REST · NEXT SET IN','skip':'Skip',
     'time-ex':'Timed exercise','strength-ex':'Strength exercise',
     'timer':'TIMER','completed.min':'completed',
+    'timer.start':'START','timer.pause':'PAUSE','timer.resume':'RESUME',
+    'timer.again':'AGAIN','timer.finished':'DONE!',
+    'sw.start':'Start','sw.stop':'Stop',
     'without-phase':'More exercises','without-phase-lbl':'No phase',
     'phase':'Phase','type.time.abbr':'⏱ Time','type.reps.abbr':'💪 Strength',
     'edit.note':'Edit','mce.desc':'Changes only apply to this plan.',
@@ -938,7 +944,7 @@ const T = {
 // Bumped together with CACHE_NAME in sw.js. The number shown here comes from
 // index.html, so it reports the build actually running -- an old page served
 // from a stale cache reports its own old number, which is the point.
-const APP_VERSION='18';
+const APP_VERSION='19';
 const APP_BUILD='2026-09-19';
 
 // The service worker's cache name is the ground truth for what is installed.
@@ -1467,8 +1473,7 @@ function abortWorkout(){
   // Discard progress, no history entry
   state.progress[state.activePlanId]=emptyProgress();
   saveState();
-  clearInterval(wuInt); wuRunning=false; swStopAll(); clearInterval(pauseInt); onWorkoutEnded();
-  document.getElementById('timerOverlay').classList.remove('active');
+  clearAllTimers(); onWorkoutEnded();
   workoutMode='home';
   renderWorkout();
   appScroll().scrollTo(0,0);
@@ -1489,7 +1494,7 @@ function finishWorkout(){
   // Reset progress for this plan
   state.progress[state.activePlanId]=emptyProgress();
   saveState();
-  clearInterval(wuInt); wuRunning=false; swStopAll(); onWorkoutEnded();
+  clearAllTimers(); onWorkoutEnded();
   workoutMode='home';
   renderWorkout();
   appScroll().scrollTo(0,0);
@@ -1581,7 +1586,7 @@ function openDetail(exId){
 }
 
 function goBack(){
-  clearInterval(wuInt);wuRunning=false;swStopAll();
+  etPause(); swStopAll();
   workoutMode='active';
   showScreen('workout');
   setWorkoutHeader(activePlan().name);
@@ -1684,13 +1689,16 @@ function renderSetRows(ex){
       <div class="et-disp" id="et-disp">${fmtTime(durSecs)}</div>
       <div class="et-bar-wrap"><div class="et-bar" id="et-bar"></div></div>
       <div class="et-btns">
-        <button class="et-btn start" id="et-btn" onclick="etToggle(${durSecs})">▶ START</button>
+        <button class="et-btn start" id="et-btn" onclick="etToggle(${durSecs})">▶ ${t('timer.start')}</button>
         <button class="et-btn reset" onclick="etReset(${durSecs})">↺</button>
       </div></div>
       <div class="set-row ${d?'done-row':''}" onclick="completeTimeEx()">
         <div class="sr-left"><div class="sr-num">✓</div><div><div class="sr-label">${fmtDur(durSecs)} ${t('completed.min')}</div></div></div>
         <div class="chk">${d?'✓':'○'}</div>
       </div>`;
+    // A countdown may already be running for this exercise -- from before the
+    // screen was left, or from before the phone was locked.
+    renderExTimer();
     return;
   }
   let h='';
@@ -1704,7 +1712,7 @@ function renderSetRows(ex){
           ${ex.sithoehe?`<div class="sr-sub">${t('seatheight.abbr')} ${ex.sithoehe}</div>`:''}
           ${!iDone?`<div class="sw-wrap">
             <span class="sw-time" id="sw-t-${ex.id}-${i}">0:00</span>
-            <button class="sw-btn" id="sw-b-${ex.id}-${i}" onclick="event.stopPropagation();swToggle('${ex.id}',${i})">▶ Start</button>
+            <button class="sw-btn" id="sw-b-${ex.id}-${i}" onclick="event.stopPropagation();swToggle('${ex.id}',${i})">▶ ${t('sw.start')}</button>
             <button class="sw-btn" onclick="event.stopPropagation();swReset('${ex.id}',${i})">↺</button>
           </div>`:`<div class="sr-sub" style="color:var(--done-border)">✓ ${t('done').replace('✓ ','')}</div>`}
         </div>
@@ -1721,6 +1729,7 @@ function renderSetRows(ex){
     row.querySelector('.sr-left').onclick=()=>toggleSet(ex.id,ii);
     row.querySelector('.chk').onclick=()=>toggleSet(ex.id,ii);
   }
+  renderStopwatches();
 }
 
 function completeTimeEx(){
@@ -1746,10 +1755,8 @@ function toggleSet(exId,setNum){
 function uncompleteSet(exId,setNum){
   swStopAll();
   // Dismiss the rest timer: it was counting down toward a set that is no
-  // longer next. `active` is the class the overlay actually uses.
-  clearInterval(pauseInt);
-  const wrap=document.getElementById('timerOverlay');
-  if(wrap) wrap.classList.remove('active');
+  // longer next.
+  clearRestTimer();
   setSets(exId,setNum-1);
   // The last set auto-marks the exercise done, so taking one back has to
   // reopen it or the exercise stays complete with a set missing.
@@ -1841,60 +1848,166 @@ function undoExDone(){ unsetDone(currentExId);setSets(currentExId,0);saveState()
 // ══════════════════════════════════════════════
 // TIMERS
 // ══════════════════════════════════════════════
-let wuInt=null,wuRem=0,wuTot=0,wuRunning=false;
+// Every timer here is a deadline, not a counter. The old ones decremented a
+// variable once a second, and iOS freezes setInterval the moment the screen
+// locks or the app goes to the background -- so the count simply stopped, and
+// what you came back to was wrong by however long you had been away.
+//
+// These store an absolute end time and derive the display from the clock, so
+// locking the phone, switching apps, or reloading the page all resume
+// correctly: the time that passed while you were away has passed.
+//
+// What no web app can do on iOS is run code while the phone is locked, so the
+// beep fires when you come back rather than on the second. A deadline that
+// went by more than TIMER_ALERT_GRACE ago is cleared silently instead --
+// alerting for something that finished ten minutes ago is just noise.
+const TIMERS_KEY='tp4_timers';
+const TIMER_ALERT_GRACE=45;
+
+function loadTimers(){
+  try{ const raw=JSON.parse(localStorage.getItem(TIMERS_KEY)); if(raw&&typeof raw==='object') return raw; }catch(e){}
+  return {};
+}
+function saveTimers(){ try{ localStorage.setItem(TIMERS_KEY, JSON.stringify(timers)); }catch(e){} }
+let timers=loadTimers();
+if(!timers.sw||typeof timers.sw!=='object') timers.sw={};
+
+// One ticker drives every display. 250ms rather than 1000ms so the seconds
+// turn over crisply and a resume redraws almost immediately.
+let tickInt=null;
+function timersRunning(){
+  if(timers.rest) return true;
+  if(timers.ex&&timers.ex.endAt) return true;
+  return Object.keys(timers.sw).some(k=>timers.sw[k]&&timers.sw[k].startedAt);
+}
+function startTicker(){ if(!tickInt) tickInt=setInterval(tickAll,250); }
+function tickAll(){
+  renderRestTimer(); renderExTimer(); renderStopwatches();
+  if(!timersRunning()&&tickInt){ clearInterval(tickInt); tickInt=null; }
+}
+function clearAllTimers(){
+  timers={sw:{}}; saveTimers();
+  if(tickInt){ clearInterval(tickInt); tickInt=null; }
+  const ov=document.getElementById('timerOverlay'); if(ov) ov.classList.remove('active');
+}
+
+// ── rest between sets ──────────────────────────────────────────────────
+function startPauseTimer(secs){
+  timers.rest={endAt:Date.now()+secs*1000,total:secs}; saveTimers();
+  const ov=document.getElementById('timerOverlay'); if(ov) ov.classList.add('active');
+  startTicker(); renderRestTimer();
+}
+function clearRestTimer(){
+  timers.rest=null; saveTimers();
+  const ov=document.getElementById('timerOverlay'); if(ov) ov.classList.remove('active');
+}
+function skipTimer(){ clearRestTimer(); }
+function renderRestTimer(){
+  const r=timers.rest, ov=document.getElementById('timerOverlay');
+  if(!r||!ov) return;
+  const rem=(r.endAt-Date.now())/1000, circ=502.65;
+  if(rem>0){
+    ov.classList.add('active');
+    const num=document.getElementById('tovNum'), bar=document.getElementById('tovBar');
+    if(num) num.textContent=Math.ceil(rem);
+    if(bar) bar.style.strokeDashoffset=circ*(1-rem/r.total);
+    return;
+  }
+  const late=-rem;
+  clearRestTimer();
+  if(late<=TIMER_ALERT_GRACE){ playBeep(660,0.1,2); vibrate([80,60,80]); }
+}
+
+// ── a timed exercise's countdown ───────────────────────────────────────
+function etRecord(){ const e=timers.ex; return (e&&e.exId===currentExId)?e:null; }
+function etLeft(e){ return e.endAt?Math.max(0,(e.endAt-Date.now())/1000):Math.max(0,e.left||0); }
 function etToggle(total){
-  if(!wuRunning){
-    if(wuRem<=0)wuRem=total; wuTot=total; wuRunning=true;
-    const btn=document.getElementById('et-btn'),disp=document.getElementById('et-disp'),bar=document.getElementById('et-bar');
-    if(btn){btn.textContent='⏸ PAUSE';btn.className='et-btn stop';}
-    if(disp)disp.className='et-disp running'; if(bar)bar.className='et-bar running';
-    wuInt=setInterval(()=>{
-      wuRem--;
-      const d=document.getElementById('et-disp'),b=document.getElementById('et-bar');
-      if(d)d.textContent=fmtTime(Math.max(0,wuRem));
-      if(b)b.style.width=Math.max(0,wuRem/wuTot*100)+'%';
-      if(wuRem<=0){ clearInterval(wuInt);wuRunning=false;
-        if(d){d.textContent='FERTIG!';d.className='et-disp finished';}
-        if(b)b.className='et-bar finished';
-        const sb=document.getElementById('et-btn'); if(sb){sb.textContent='▶ NOCHMAL';sb.className='et-btn start';}
-        // Signal: beep + vibrate + notification
-        playBeep(880, 0.15, 3);
-        vibrate([100, 80, 100, 80, 300]);
-        const ex = activePlan().exercises.find(e=>e.id===currentExId);
-        showNotification('✅ ' + (ex ? ex.name : t('completed.min')), t('timer.done.notification') || 'Zeit abgelaufen – Übung abschließen!');
+  const e=etRecord();
+  if(e&&e.endAt){                              // running -> hold
+    timers.ex={exId:currentExId,total:e.total,left:etLeft(e)};
+  }else{                                       // start, or pick up where it was held
+    const left=(e&&e.left>0)?e.left:total;
+    timers.ex={exId:currentExId,total:total,endAt:Date.now()+left*1000};
+  }
+  saveTimers(); startTicker(); renderExTimer();
+}
+function etReset(total){
+  timers.ex={exId:currentExId,total:total,left:total}; saveTimers(); renderExTimer();
+}
+// Leaving the detail screen holds the countdown where it is, which is what the
+// interval version did by clearing itself while keeping its remaining value.
+function etPause(){
+  const e=timers.ex;
+  if(e&&e.endAt){ e.left=etLeft(e); delete e.endAt; saveTimers(); }
+}
+function renderExTimer(){
+  const disp=document.getElementById('et-disp'); if(!disp) return;
+  const bar=document.getElementById('et-bar'), btn=document.getElementById('et-btn');
+  const e=etRecord();
+  const total=e?e.total:exDurSecs(getEx(currentExId)||{});
+  const left=e?etLeft(e):total;
+  const running=!!(e&&e.endAt);
+
+  if(e&&left<=0){
+    disp.textContent=t('timer.finished'); disp.className='et-disp finished';
+    if(bar){ bar.style.width='0%'; bar.className='et-bar finished'; }
+    if(btn){ btn.textContent='▶ '+t('timer.again'); btn.className='et-btn start'; }
+    if(!e.fired){
+      const late=e.endAt?(Date.now()-e.endAt)/1000:0;
+      e.fired=true; e.left=0; delete e.endAt; saveTimers();
+      if(late<=TIMER_ALERT_GRACE){
+        playBeep(880,0.15,3);
+        vibrate([100,80,100,80,300]);
+        const ex=getEx(currentExId);
+        showNotification('✅ '+(ex?ex.name:t('timer')), t('timer.done.notification'));
       }
-    },1000);
-  } else {
-    clearInterval(wuInt);wuRunning=false;
-    const btn=document.getElementById('et-btn'),disp=document.getElementById('et-disp');
-    if(btn){btn.textContent='▶ WEITER';btn.className='et-btn start';} if(disp)disp.className='et-disp';
+    }
+    return;
+  }
+  disp.textContent=fmtTime(Math.ceil(left));
+  disp.className='et-disp'+(running?' running':'');
+  if(bar){ bar.style.width=Math.max(0,left/total*100)+'%'; bar.className='et-bar'+(running?' running':''); }
+  if(btn){
+    btn.textContent=running?('⏸ '+t('timer.pause'))
+                           :('▶ '+(left<total?t('timer.resume'):t('timer.start')));
+    btn.className='et-btn '+(running?'stop':'start');
   }
 }
-function etReset(total){ clearInterval(wuInt);wuRunning=false;wuRem=total;wuTot=total;
-  const d=document.getElementById('et-disp'),b=document.getElementById('et-bar'),btn=document.getElementById('et-btn');
-  if(d){d.textContent=fmtTime(total);d.className='et-disp';} if(b){b.style.width='100%';b.className='et-bar';}
-  if(btn){btn.textContent='▶ START';btn.className='et-btn start';}
+
+// ── per-set stopwatch ──────────────────────────────────────────────────
+function swKey(e,i){ return e+'-'+i; }
+function swElapsed(k){
+  const sw=timers.sw[k]; if(!sw) return 0;
+  return (sw.acc||0)+(sw.startedAt?(Date.now()-sw.startedAt)/1000:0);
 }
-let swInts={},swSecs={},swRun={};
-function swKey(e,i){return e+'-'+i;}
-function swToggle(exId,i){ const k=swKey(exId,i);
-  if(!swRun[k]){ swRun[k]=true; if(!swSecs[k])swSecs[k]=0;
-    const btn=document.getElementById('sw-b-'+k); if(btn){btn.textContent='⏸ Stop';btn.className='sw-btn active';}
-    swInts[k]=setInterval(()=>{swSecs[k]++;const el=document.getElementById('sw-t-'+k);if(el)el.textContent=fmtTime(swSecs[k]);},1000);
-  } else { swRun[k]=false;clearInterval(swInts[k]); const btn=document.getElementById('sw-b-'+k); if(btn){btn.textContent='▶ Start';btn.className='sw-btn';} }
+function swToggle(exId,i){
+  const k=swKey(exId,i), sw=timers.sw[k]||{acc:0,startedAt:null};
+  if(sw.startedAt){ sw.acc=swElapsed(k); sw.startedAt=null; }
+  else sw.startedAt=Date.now();
+  timers.sw[k]=sw; saveTimers(); startTicker(); renderStopwatches();
 }
-function swReset(exId,i){ const k=swKey(exId,i);clearInterval(swInts[k]);swRun[k]=false;swSecs[k]=0;
-  const el=document.getElementById('sw-t-'+k),btn=document.getElementById('sw-b-'+k);
-  if(el)el.textContent='0:00'; if(btn){btn.textContent='▶ Start';btn.className='sw-btn';}
+function swReset(exId,i){
+  timers.sw[swKey(exId,i)]={acc:0,startedAt:null}; saveTimers(); renderStopwatches();
 }
-function swStopAll(){ Object.keys(swInts).forEach(k=>{clearInterval(swInts[k]);swRun[k]=false;}); }
-let pauseInt=null;
-function startPauseTimer(secs){ clearInterval(pauseInt);let rem=secs;const circ=502.65;
-  const ov=document.getElementById('timerOverlay'),bar=document.getElementById('tovBar'),num=document.getElementById('tovNum');
-  ov.classList.add('active');num.textContent=rem;bar.style.strokeDashoffset=0;
-  pauseInt=setInterval(()=>{rem--;num.textContent=rem;bar.style.strokeDashoffset=circ*(1-rem/secs);if(rem<=0){clearInterval(pauseInt);ov.classList.remove('active');playBeep(660,0.1,2);vibrate([80,60,80]);}},1000);
+function swStopAll(){
+  Object.keys(timers.sw).forEach(k=>{
+    const sw=timers.sw[k];
+    if(sw&&sw.startedAt){ sw.acc=swElapsed(k); sw.startedAt=null; }
+  });
+  saveTimers(); renderStopwatches();
 }
-function skipTimer(){ clearInterval(pauseInt);document.getElementById('timerOverlay').classList.remove('active'); }
+function renderStopwatches(){
+  Object.keys(timers.sw).forEach(k=>{
+    const el=document.getElementById('sw-t-'+k);
+    if(el) el.textContent=fmtTime(Math.floor(swElapsed(k)));
+    const btn=document.getElementById('sw-b-'+k);
+    if(btn){
+      const on=!!(timers.sw[k]&&timers.sw[k].startedAt);
+      btn.textContent=(on?'⏸ ':'▶ ')+t(on?'sw.stop':'sw.start');
+      btn.className='sw-btn'+(on?' active':'');
+    }
+  });
+}
 
 // ══════════════════════════════════════════════
 // SETTINGS
@@ -2604,7 +2717,7 @@ function newWorkout(){
   const hasProgress=prog.doneExercises.length>0||Object.values(prog.completedSets).some(v=>v>0);
   if(hasProgress) saveHistory();
   state.progress[state.activePlanId]=emptyProgress();
-  saveState();clearInterval(wuInt);wuRunning=false;swStopAll();
+  saveState();clearAllTimers();
   workoutMode='home'; showScreen('workout');appScroll().scrollTo(0,0);
 }
 function confirmResetAll(){ if(!confirm(t('confirm.reset-all')))return; localStorage.removeItem('tp4_state');location.reload(); }
@@ -2705,6 +2818,9 @@ function closeModal(id){ document.getElementById(id).classList.remove('active');
 // ══════════════════════════════════════════════
 wheelInit();
 applyTranslations();
+// Pick up anything that was still running when the app was last closed.
+if(timersRunning()) startTicker();
+tickAll();
 renderPlanSwitcher();
 workoutMode = 'home';
 renderWorkout();
@@ -2735,9 +2851,16 @@ async function releaseWakeLock() {
 }
 // Re-acquire wake lock if page becomes visible again (e.g. after notification)
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && workoutMode === 'active') requestWakeLock();
-  else if (document.visibilityState === 'hidden') releaseWakeLock();
+  if (document.visibilityState === 'visible') {
+    // Coming back from a lock or an app switch: every timer is derived from
+    // the clock, so catching up is just a redraw.
+    tickAll();
+    if (workoutMode === 'active') requestWakeLock();
+  } else releaseWakeLock();
 });
+// iOS restores a backgrounded page from its back/forward cache, which fires
+// pageshow rather than visibilitychange.
+window.addEventListener('pageshow', tickAll);
 
 // ══════════════════════════════════════════════
 // SOUND – beep on timer end (Web Audio API)
