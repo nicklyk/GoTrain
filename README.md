@@ -20,7 +20,7 @@ unless you choose to move it.
 - **History** — every finished session is saved with its full exercise detail
 - **Progress** — the weight you set per exercise is kept with each session, so
   your load over time is recorded, not just that you turned up
-- **Send to PC** — scan a pairing code and hand your data to a desktop over
+- **Phone to PC** — scan a pairing code and hand your data to a desktop over
   the local network, or export the file and share it however you like
 - **Export / import** — a plain `.json` file you own
 - **English & German** — switch in Settings
