@@ -6,9 +6,9 @@ unless you choose to move it.
 
 **[Try the demo →](https://niclick.org/GoTrain)** · Free software (GPL-3.0-or-later)
 
-| | | | |
-|---|---|---|---|
-| <img src="screenshot-1.png" width="180" alt="Home screen"> | <img src="screenshot-2.png" width="180" alt="Editing a plan"> | <img src="screenshot-3.png" width="180" alt="Workout history"> | <img src="screenshot-4.png" width="180" alt="Workout paused"> |
+| | | | | |
+|---|---|---|---|---|
+| <img src="screenshot-1.png" width="150" alt="Home screen"> | <img src="screenshot-2.png" width="150" alt="Editing a plan"> | <img src="screenshot-3.png" width="150" alt="Workout history"> | <img src="screenshot-4.png" width="150" alt="Workout paused"> | <img src="screenshot-5.png" width="150" alt="Settings and install"> |
 
 ## Features
 

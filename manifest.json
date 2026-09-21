@@ -78,6 +78,13 @@
       "type": "image/png",
       "form_factor": "narrow",
       "label": "GoTrain — workout paused"
+    },
+    {
+      "src": "screenshot-5.png",
+      "sizes": "1206x2622",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "GoTrain — settings and install"
     }
   ]
 }
