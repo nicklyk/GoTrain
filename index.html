@@ -514,6 +514,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
       <button class="btn-outline" id="btn-new-workout" onclick="newWorkout()"></button>
       <button class="btn-danger" id="btn-reset-all" onclick="confirmResetAll()"></button>
     </div>
+    <div class="sec-label" id="sec-install" style="display:none"></div>
+    <div class="card" id="install-card" style="display:none;padding:12px 16px">
+      <button class="btn-outline" id="btn-install" onclick="doInstall()"></button>
+      <div class="g-sub" id="install-hint" style="margin-top:8px"></div>
+    </div>
     <div class="app-version" id="app-version"></div>
   </div>
 </div>
@@ -773,6 +778,10 @@ const T = {
     'tab.plans':'📋 Pläne','tab.exercises':'🏋️ Übungen','tab.general':'⚙️ Allgemein',
     'tab.phases':'Phasen','tab.exercises2':'Übungen',
     'section.general':'ALLGEMEIN','section.data':'DATEN','section.workout':'WORKOUT',
+    'section.install':'INSTALLIEREN',
+    'install.btn':'Zum Startbildschirm hinzufügen',
+    'install.hint':'Installiert GoTrain als eigenständige App, mit eigenem Symbol und ohne Browserleiste.',
+    'install.ios':'Auf „Teilen“ tippen und dann auf „Zum Home-Bildschirm“. Der Browser erlaubt es nicht, das von hier aus zu öffnen.',
     'gs.pause.lbl':'Standard-Pause','gs.pause.sub':'Zwischen Sätzen',
     'gs.lang.lbl':'Sprache','gs.lang.sub':'App-Sprache',
     'btn.export':'Exportieren','btn.import':'Importieren',
@@ -859,6 +868,10 @@ const T = {
     'tab.plans':'📋 Plans','tab.exercises':'🏋️ Exercises','tab.general':'⚙️ General',
     'tab.phases':'Phases','tab.exercises2':'Exercises',
     'section.general':'GENERAL','section.data':'DATA','section.workout':'WORKOUT',
+    'section.install':'INSTALL',
+    'install.btn':'Add to Home Screen',
+    'install.hint':'Installs GoTrain as its own app, with its own icon and no browser bar.',
+    'install.ios':'Tap Share, then "Add to Home Screen". The browser gives no way to open that from in here.',
     'gs.pause.lbl':'Default rest','gs.pause.sub':'Between sets',
     'gs.lang.lbl':'Language','gs.lang.sub':'App language',
     'btn.export':'Export','btn.import':'Import',
@@ -947,8 +960,62 @@ const T = {
 // never sees the other two. The number shown comes from index.html, so it
 // reports the build actually running: an old page served from a stale cache
 // reports its own old number, which is the point.
-const APP_VERSION='21';
+const APP_VERSION='22';
 const APP_BUILD='2026-09-21';
+
+// ══════════════════════════════════════════════
+// ADD TO HOME SCREEN
+// ══════════════════════════════════════════════
+// Chrome hands over a beforeinstallprompt event that a button can fire, so on
+// Android and the desktop this really installs. Safari has never implemented
+// it and offers nothing equivalent, so on iOS the row can only say where the
+// control is -- which is still worth having, since nothing else in the app
+// hints that it can live on the home screen at all.
+let deferredInstall=null;
+
+function isStandalone(){
+  try{
+    return window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone===true;
+  }catch(e){ return false; }
+}
+// An iPad reports itself as a Mac, so the touch check is what separates them.
+function isIOS(){
+  const ua=navigator.userAgent||'';
+  return /iP(hone|ad|od)/.test(navigator.platform||ua)
+      || (ua.indexOf('Mac')>=0 && 'ontouchend' in document);
+}
+
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();          // keep it, and offer it from our own button
+  deferredInstall=e;
+  renderInstall();
+});
+window.addEventListener('appinstalled', ()=>{ deferredInstall=null; renderInstall(); });
+
+function renderInstall(){
+  const lbl=document.getElementById('sec-install'),
+        card=document.getElementById('install-card');
+  if(!lbl||!card) return;
+  const show=!isStandalone()&&(deferredInstall||isIOS());
+  lbl.style.display=show?'':'none';
+  card.style.display=show?'':'none';
+  if(!show) return;
+  lbl.textContent=t('section.install');
+  const btn=document.getElementById('btn-install'),
+        hint=document.getElementById('install-hint');
+  btn.style.display=deferredInstall?'':'none';
+  btn.textContent=t('install.btn');
+  hint.textContent=deferredInstall?t('install.hint'):t('install.ios');
+}
+
+async function doInstall(){
+  if(!deferredInstall) return;
+  const e=deferredInstall;
+  deferredInstall=null;        // the event is single-use; Chrome re-fires later
+  try{ e.prompt(); await e.userChoice; }catch(err){}
+  renderInstall();
+}
 
 // The service worker's cache name is the ground truth for what is installed.
 // Showing it alongside makes the "new build, second launch" state legible
@@ -1183,6 +1250,7 @@ function applyTranslations(){
   document.getElementById('h-plan-name').textContent = 'GOTRAIN';
   document.getElementById('h-sub').textContent = '';
   syncHeaderOffset();
+  renderInstall();
   renderVersion();
 }
 

@@ -31,7 +31,10 @@ unless you choose to move it.
 
 **iPhone (Safari):** open the site → Share → **Add to Home Screen**.
 
-**Android (Chrome):** open the site → menu → **Install app**.
+**Android (Chrome):** open the site → menu → **Install app**, or use the
+**Add to Home Screen** button under Settings → Install, which opens the same
+prompt. Safari has no equivalent to offer, so on iOS that row shows the two
+steps above instead of a button.
 
 It then launches fullscreen with no browser chrome, and works with no
 connection.
