@@ -2621,16 +2621,25 @@ function exportData(){
 
 function exportFilename(){ return 'gotrain-'+new Date().toISOString().slice(0,10)+'.json'; }
 function triggerImport(){ document.getElementById('import-file').click(); }
+// Split from importData so the merge can be exercised without a file picker.
+function applyImport(imported){
+  if(!imported||!Array.isArray(imported.plans)||!('activePlanId' in imported)) throw new Error('invalid');
+  // Exports from before 2026-09-10 carry no schema field at all. Left alone,
+  // Object.assign would keep the running state's schema, both migrations would
+  // see it as current and skip, and every timed exercise would fall back to
+  // the default five minutes. No field means the oldest schema.
+  if(imported.schema==null) imported.schema=1;
+  Object.assign(state,imported);
+  migrateMuscles(state);
+  migrateDurations(state);
+  lang=state.lang||'en';
+}
 function importData(event){
   const file=event.target.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      const imported=JSON.parse(e.target.result);
-      if(!Array.isArray(imported.plans)||!('activePlanId' in imported)) throw new Error('invalid');
-      Object.assign(state,imported);
-      migrateMuscles(state);          // an older export still holds labels
-      lang=state.lang||'en';
+      applyImport(JSON.parse(e.target.result));
       saveState(); location.reload();
     } catch(err){ alert(t('import.error')); }
   };

@@ -312,10 +312,43 @@ def test_duration_migration():
     report(drive(old, body), "migration")
 
 
+def test_import_of_an_old_export():
+    print("\nimport of an old export (browser)")
+    if not browser():
+        skip("import migration", "no chromium found")
+        return
+    # Exports written before 2026-09-10 have no schema field. Importing one
+    # into a current install must still migrate it, not inherit schema 3.
+    old = json.loads(json.dumps(DEMO))
+    del old["schema"]
+    for e in old["plans"][0]["exercises"]:
+        e.pop("durationSecs", None)
+    old["plans"][0]["exercises"][0]["muscle"] = "Brust"
+    old["plans"][0]["exercises"][1]["durationMin"] = "10"
+    old["history"] = [{"id": "h1", "ts": "2026-09-01T10:00:00Z", "exercises": [
+        {"id": "x2", "name": "Row", "muscle": "Cardio", "type": "time", "durationMin": "12"}]}]
+    current = json.loads(json.dumps(DEMO))
+    current["plans"][0]["exercises"][1]["durationSecs"] = 900
+    body = """
+      w.applyImport(%s);
+      const S=w.eval('state');
+      ok('an old import reaches schema 3', S.schema, 3);
+      ok('its timed exercise keeps its length', S.plans[0].exercises[1].durationSecs, 600);
+      ok('its muscle label becomes a key', S.plans[0].exercises[0].muscle, 'chest');
+      ok('its history is migrated too', S.history[0].exercises[0].durationSecs, 720);
+      w.applyImport(%s);
+      ok('a current import is taken as is', w.eval('state').plans[0].exercises[1].durationSecs, 900);
+      let threw=false; try{ w.applyImport({plans:'x'}); }catch(e){ threw=true; }
+      ok('a malformed file is still refused', threw, true);
+    """ % (json.dumps(old), json.dumps(current))
+    report(drive(DEMO, body), "import")
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
-              test_timers_survive_a_locked_screen, test_duration_migration):
+              test_timers_survive_a_locked_screen, test_duration_migration,
+              test_import_of_an_old_export):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
