@@ -57,6 +57,24 @@ sees the other two. `tests/run` fails if version and cache disagree.
   timers, `overscroll-behavior` being ignored on the document, `-webkit-overflow-
   scrolling` breaking sticky.
 
+## Testing traps in this repo
+
+The behavioural tests drive the real app in headless Chromium. Four things
+cost hours to rediscover:
+
+- **A top-level `let` is not a window property.** `w.state` and `w.timers` read
+  as `undefined` from a driver page. Reach them with `w.eval('state')`.
+- **`--virtual-time-budget` throttles `requestAnimationFrame`.** CSS
+  transitions park at their starting value, so the progress ring renders as an
+  empty circle and rAF loops look broken when they are not. Disable the
+  transition from the driver, or drive the function directly instead of
+  waiting for frames.
+- **`--dump-dom` can return before your timers have fired.** A driver that
+  reports through `document.title` needs the budget to comfortably exceed its
+  own `setTimeout`, or you get `pending` and no explanation.
+- **`pkill -f <pattern>` matches its own command line** and will kill the shell
+  running it. Match on something narrower, or skip it.
+
 ## Never
 
 - Never push to `main`. Work on a branch and open a draft PR; merging is the
