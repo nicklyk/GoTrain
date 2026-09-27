@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""Regression tests for the GoTrain PWA.
+
+Run with no arguments:  tests/run
+
+Two layers. The static checks need nothing but python3 and catch the whole
+class of mistakes this single-file app is prone to: a translation key that
+exists in one language and not the other, a key defined twice so the first
+silently never renders, a string nothing reads any more, a version marker left
+behind, an asset the service worker precaches that is not in the repo.
+
+The behavioural checks drive the real app in headless Chromium. They are
+skipped, loudly, when no browser is present -- so this suite is still worth
+running somewhere without one, it just tells you what it could not check.
+
+Nothing here touches the network or the live site.
+"""
+
+import json
+import os
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+INDEX = ROOT / "index.html"
+SW = ROOT / "sw.js"
+MANIFEST = ROOT / "manifest.json"
+
+passed = 0
+skipped = 0
+failures = []
+
+
+def check(name, got, want):
+    global passed
+    if got == want:
+        passed += 1
+        print(f"  ok   {name}")
+    else:
+        failures.append(f"{name}\n       got  {got!r}\n       want {want!r}")
+        print(f"  FAIL {name}\n       got  {got!r}\n       want {want!r}")
+
+
+def skip(name, why):
+    global skipped
+    skipped += 1
+    print(f"  skip {name} ({why})")
+
+
+def source():
+    return INDEX.read_text()
+
+
+def app_script():
+    """The last <script> block, which is the whole application."""
+    return re.findall(r"<script>(.*?)</script>", source(), re.S)[-1]
+
+
+# ── translations ─────────────────────────────────────────────────────────
+def translation_tables():
+    lines = source().split("\n")
+    start = next(i for i, l in enumerate(lines) if l.startswith("const T = {"))
+    de = next(i for i in range(start, len(lines)) if lines[i].strip().startswith("de: {"))
+    en = next(i for i in range(de, len(lines)) if lines[i].strip().startswith("en: {"))
+    end = next(i for i in range(en, len(lines)) if lines[i].startswith("};"))
+
+    def keys(a, b):
+        out = []
+        for line in lines[a + 1:b]:
+            out += re.findall(r"'([a-z0-9][a-zA-Z0-9._-]*)'\s*:", line)
+        return out
+
+    return keys(de, en), keys(en, end)
+
+
+def test_translations():
+    print("\ntranslations")
+    de, en = translation_tables()
+    check("both languages define the same keys", sorted(set(de)), sorted(set(en)))
+    # A key written twice in one object literal silently loses its first value.
+    # That had happened twice here before anything checked for it.
+    check("no duplicate keys in German", [k for k in set(de) if de.count(k) > 1], [])
+    check("no duplicate keys in English", [k for k in set(en) if en.count(k) > 1], [])
+
+    defined = set(de)
+    src = source()
+    # Every quoted string inside a t(...) call, not just t('literal') -- keys
+    # are also reached through ternaries, as in t(on ? 'sw.stop' : 'sw.start').
+    used = set()
+    for call in re.findall(r"\bt\(([^()]*)\)", src):
+        used |= set(re.findall(r"'([a-z0-9][a-zA-Z0-9._-]*)'", call))
+    used |= set(re.findall(r'data-i="([a-z0-9][a-zA-Z0-9._-]*)"', src))
+    # And keys built by concatenation, as in t('muscle.' + value). The prefix
+    # covers every key beneath it; there is no literal to match.
+    prefixes = re.findall(r"\bt\('([a-z0-9][a-zA-Z0-9._-]*\.)'\s*\+", src)
+    covered = {k for k in defined if any(k.startswith(p) for p in prefixes)}
+
+    used -= set(prefixes)          # a prefix is not itself a key
+    # Every key asked for at runtime must exist, or the UI renders the key
+    # name. t() falls back silently, so nothing else would catch a typo.
+    check("every key used is defined", sorted(used - defined), [])
+    # And the reverse: strings nothing reads are dead weight that drifts out
+    # of date and gets translated for no reason.
+    check("no orphaned strings", sorted(defined - used - covered), [])
+
+
+# ── the shipped build ────────────────────────────────────────────────────
+def test_version_markers():
+    print("\nversion markers")
+    src = source()
+    version = re.search(r"const APP_VERSION='(\d+)'", src).group(1)
+    build = re.search(r"const APP_BUILD='(\d{4}-\d{2}-\d{2})'", src).group(1)
+    cache = re.search(r"const CACHE_NAME = 'gotrain-v(\d+)'", SW.read_text()).group(1)
+    # Without the cache bump the phone keeps serving the old page, so the
+    # version on screen would report a build the user is not running.
+    check("APP_VERSION matches CACHE_NAME", version, cache)
+    check("APP_BUILD is a plausible date", bool(re.match(r"20\d\d-\d\d-\d\d", build)), True)
+
+
+def test_service_worker_assets():
+    print("\nservice worker")
+    sw = SW.read_text()
+    assets = re.search(r"const ASSETS = \[(.*?)\];", sw, re.S).group(1)
+    paths = re.findall(r"'\./([^']*)'", assets)
+    missing = [p for p in paths if p and not (ROOT / p).exists()]
+    # A precached path that does not exist makes install() reject, and the
+    # whole service worker fails to install -- silently, offline stops working.
+    check("every precached asset exists", missing, [])
+    check("the shell is precached", "index.html" in paths, True)
+
+
+def test_manifest():
+    print("\nmanifest")
+    m = json.loads(MANIFEST.read_text())
+    check("display is standalone", m["display"], "standalone")
+    for icon in m["icons"]:
+        check(f"icon {icon['src']} exists", (ROOT / icon["src"]).exists(), True)
+
+    def png_size(path):
+        head = Path(path).read_bytes()[:33]
+        return "x".join(str(n) for n in struct.unpack(">II", head[16:24]))
+
+    for shot in m.get("screenshots", []):
+        p = ROOT / shot["src"]
+        if not p.exists():
+            check(f"screenshot {shot['src']} exists", False, True)
+            continue
+        # A declared size that does not match the file makes the install
+        # prompt drop the screenshot without saying why.
+        check(f"{shot['src']} matches its declared size", png_size(p), shot["sizes"])
+
+
+def test_syntax_and_licence():
+    print("\nsource")
+    node = shutil.which("node")
+    if node:
+        with tempfile.TemporaryDirectory() as d:
+            js = Path(d) / "app.js"
+            js.write_text(app_script())
+            r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True)
+            check("the application script parses", r.returncode, 0)
+    else:
+        skip("javascript syntax", "node not installed")
+
+    src = source()
+    check("GPL notice present", "GNU General Public License" in src, True)
+    # LibreJS needs the magnet marker to recognise the page as free software.
+    check("LibreJS marker present", "@license" in src, True)
+    # The claim is that the app makes no third-party requests, so look at what
+    # actually loads something -- not at prose. Comments carry attribution
+    # links (jsQR's homepage) that fetch nothing.
+    loaders = []
+    loaders += re.findall(r"""<(?:script|img|iframe|source)[^>]*\ssrc=["\']([^"\']+)""", src)
+    loaders += re.findall(r"""<link[^>]*\shref=["\']([^"\']+)""", src)
+    loaders += re.findall(r"""@import\s+["\']([^"\']+)""", src)
+    loaders += re.findall(r"""url\((["\']?)(https?://[^)"\']+)""", src)
+    loaders = [u[1] if isinstance(u, tuple) else u for u in loaders]
+    external = sorted({u for u in loaders
+                       if u.startswith("http") and "niclick.org" not in u})
+    check("nothing off-origin is loaded", external, [])
+
+
+# ── behaviour, in a real browser ─────────────────────────────────────────
+def browser():
+    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return None
+
+
+DRIVER = """<!doctype html><meta charset="utf-8"><title>pending</title>
+<script>
+const out=[];
+function ok(n,got,want){ out.push((String(got)===String(want)?'ok|':'FAIL|')+n+'|'+got+'|'+want); }
+localStorage.setItem('tp4_state', JSON.stringify(%(state)s));
+const f=document.createElement('iframe');
+f.style.cssText='width:402px;height:874px;border:0';
+f.src='index.html';
+addEventListener('DOMContentLoaded',()=>document.body.appendChild(f));
+setTimeout(()=>{
+  try{ const w=f.contentWindow, d=f.contentDocument; %(body)s }
+  catch(e){ out.push('FAIL|driver threw|'+e.message+'|-'); }
+  document.title=out.join('~');
+}, 2000);
+</script>"""
+
+
+def drive(state, body, timeout=90):
+    """Run assertions inside the real app and return them."""
+    chrome = browser()
+    with tempfile.TemporaryDirectory() as d:
+        work = Path(d)
+        shutil.copy(INDEX, work / "index.html")
+        (work / "driver.html").write_text(DRIVER % {"state": json.dumps(state), "body": body})
+        srv = subprocess.Popen([sys.executable, "-m", "http.server", "8771", "--bind", "127.0.0.1"],
+                               cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            subprocess.run(["python3", "-c",
+                            "import socket,time\n"
+                            "for _ in range(50):\n"
+                            "    try:\n"
+                            "        socket.create_connection(('127.0.0.1',8771),0.1).close(); break\n"
+                            "    except OSError: time.sleep(0.1)"], check=False)
+            r = subprocess.run([chrome, "--headless", "--disable-gpu", "--no-sandbox",
+                                "--virtual-time-budget=30000", "--window-size=402,874",
+                                "--dump-dom", "http://127.0.0.1:8771/driver.html"],
+                               capture_output=True, text=True, timeout=timeout)
+        finally:
+            srv.terminate()
+    m = re.search(r"<title>([^<]*)</title>", r.stdout)
+    return m.group(1).split("~") if m and m.group(1) != "pending" else []
+
+
+def report(results, label):
+    if not results:
+        check(f"{label}: the driver reported back", False, True)
+        return
+    for row in results:
+        parts = row.split("|")
+        if len(parts) == 4:
+            check(parts[1], parts[2], parts[3] if parts[0] == "ok" else parts[3])
+
+
+DEMO = {
+    "schema": 3, "globalPauseSecs": 75, "lang": "en", "activePlanId": "p1",
+    "plans": [{"id": "p1", "name": "Plan", "phases": [{"id": "ph", "name": "S", "colorIdx": 0}],
+               "exercises": [
+                   {"id": "x1", "phaseId": "ph", "icon": "1", "name": "Bench", "muscle": "chest",
+                    "type": "reps", "sets": 3, "reps": "8", "sithoehe": "", "kg": "60",
+                    "pauseSecs": None, "durationSecs": 300, "note": ""},
+                   {"id": "x2", "phaseId": "ph", "icon": "2", "name": "Row", "muscle": "cardio",
+                    "type": "time", "sets": 1, "reps": "", "sithoehe": "", "kg": "",
+                    "pauseSecs": None, "durationSecs": 480, "note": ""}]}],
+    "globalExercises": [], "progress": {}, "history": [],
+}
+
+
+def test_timers_survive_a_locked_screen():
+    print("\ntimers (browser)")
+    if not browser():
+        skip("timer behaviour", "no chromium found")
+        return
+    # Locking an iPhone looks exactly like the clock moving on while no JS
+    # ran. Every timer must be derived from the clock, not counted down.
+    body = """
+      const REAL=Date.now(); let off=0;
+      w.Date.now = () => REAL + off;
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      w.startWithPlan('p1'); w.openDetail('x1');
+      w.startPauseTimer(75);
+      ok('rest shows its full length', d.getElementById('tovNum').textContent, 75);
+      off=40000; w.tickAll();
+      ok('rest catches up after 40s away', d.getElementById('tovNum').textContent, 35);
+      off=80000; w.tickAll();
+      ok('rest closes once elapsed', d.getElementById('timerOverlay').classList.contains('active'), false);
+      off=0; w.openDetail('x2');
+      ok('countdown starts at its duration', d.getElementById('et-disp').textContent, '8:00');
+      w.etToggle(480); off=100000; w.tickAll();
+      ok('countdown follows the clock', d.getElementById('et-disp').textContent, '6:20');
+      w.etToggle(480); off=900000; w.tickAll();
+      ok('a held countdown does not drift', d.getElementById('et-disp').textContent, '6:20');
+      w.openDetail('x1'); w.swToggle('x1',1);
+      off=900000+65000; w.tickAll();
+      ok('stopwatch follows the clock', d.getElementById('sw-t-x1-1').textContent, '1:05');
+    """
+    report(drive(DEMO, body), "timers")
+
+
+def test_duration_migration():
+    print("\nduration migration (browser)")
+    if not browser():
+        skip("duration migration", "no chromium found")
+        return
+    old = json.loads(json.dumps(DEMO))
+    old["schema"] = 2
+    for e in old["plans"][0]["exercises"]:
+        e.pop("durationSecs", None)
+    old["plans"][0]["exercises"][1]["durationMin"] = "5-10"
+    old["plans"][0]["exercises"][0]["durationMin"] = "12"
+    body = """
+      const S=JSON.parse(localStorage.getItem('tp4_state'));
+      ok('schema moves to 3', S.schema, 3);
+      ok('a range collapses to its first number', S.plans[0].exercises[1].durationSecs, 300);
+      ok('a plain value converts', S.plans[0].exercises[0].durationSecs, 720);
+    """
+    report(drive(old, body), "migration")
+
+
+def main():
+    for t in (test_translations, test_version_markers, test_service_worker_assets,
+              test_manifest, test_syntax_and_licence,
+              test_timers_survive_a_locked_screen, test_duration_migration):
+        t()
+    print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
+    if failures:
+        print("\nfailures:")
+        for f in failures:
+            print(f"  {f}")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
