@@ -381,6 +381,16 @@ def test_import_asks_before_shrinking_history():
       ok('declining keeps the plans', w.eval('state').plans[0].name, 'Plan');
       ok('declining saves nothing', localStorage.getItem('tp4_state'), saved);
 
+      // The same through importData, which must not save or reload after a
+      // no. A real FileReader never fires under --virtual-time-budget, so a
+      // stand-in hands the text straight to onload.
+      asked=[]; let alerted=0; w.alert=()=>{ alerted++; };
+      w.FileReader=function(){ this.readAsText=s=>this.onload({target:{result:s}}); };
+      w.importData({target:{files:[JSON.stringify(older)]}});
+      ok('declining a picked file asks once', asked.length, 1);
+      ok('declining a picked file is not an error', alerted, 0);
+      ok('declining a picked file saves nothing', localStorage.getItem('tp4_state'), saved);
+
       w.eval("lang='de'"); asked=[];
       w.applyImport(clone(older));
       ok('the question is asked in German too', asked[0].includes('In der App: 2'), true);
