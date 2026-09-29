@@ -844,6 +844,7 @@ const T = {
     'alert.last-plan':'Letzten Plan kann man nicht löschen.',
     'alert.no-name':'Bitte Name eingeben.',
     'import.error':'Ungültige Datei.',
+    'import.confirm.fewer':'Diese Datei enthält weniger Workouts als die App.\n\nIn der App: {n}\nIn der Datei: {m}\n\nDer Import ersetzt deinen Verlauf durch den aus der Datei. Workouts, die dort fehlen, gehen verloren. Trotzdem importieren?',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
     'history.time':'Uhrzeit','history.sets':'Sätze',
     'plan.empty':'Neuer leerer Plan','plan.copy':'Kopie',
@@ -934,6 +935,7 @@ const T = {
     'alert.last-plan':'Cannot delete the last plan.',
     'alert.no-name':'Please enter a name.',
     'import.error':'Invalid file.',
+    'import.confirm.fewer':'This file has fewer workouts than this app.\n\nIn this app: {n}\nIn the file: {m}\n\nImporting replaces your history with the one in the file. Workouts missing from it are lost. Import anyway?',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
     'history.time':'Time','history.sets':'Sets',
     'plan.empty':'New empty plan','plan.copy':'Copy',
@@ -2622,8 +2624,16 @@ function exportData(){
 function exportFilename(){ return 'gotrain-'+new Date().toISOString().slice(0,10)+'.json'; }
 function triggerImport(){ document.getElementById('import-file').click(); }
 // Split from importData so the merge can be exercised without a file picker.
+// Returns false when the user declines, leaving state untouched.
 function applyImport(imported){
   if(!imported||!Array.isArray(imported.plans)||!('activePlanId' in imported)) throw new Error('invalid');
+  // Object.assign below replaces history wholesale, and tp4_state is the only
+  // copy. Importing an older backup would silently drop every workout logged
+  // since it was taken, so name the counts and let the user back out. A file
+  // with no history field at all leaves history alone and needs no question.
+  const have=(state.history||[]).length;
+  if(Array.isArray(imported.history) && imported.history.length<have
+     && !confirm(t('import.confirm.fewer').replace('{n}',have).replace('{m}',imported.history.length))) return false;
   // Exports from before 2026-09-10 carry no schema field at all. Left alone,
   // Object.assign would keep the running state's schema, both migrations would
   // see it as current and skip, and every timed exercise would fall back to
@@ -2633,13 +2643,14 @@ function applyImport(imported){
   migrateMuscles(state);
   migrateDurations(state);
   lang=state.lang||'en';
+  return true;
 }
 function importData(event){
   const file=event.target.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      applyImport(JSON.parse(e.target.result));
+      if(!applyImport(JSON.parse(e.target.result))) return;
       saveState(); location.reload();
     } catch(err){ alert(t('import.error')); }
   };

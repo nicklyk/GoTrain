@@ -336,6 +336,9 @@ def test_import_of_an_old_export():
       ok('its timed exercise keeps its length', S.plans[0].exercises[1].durationSecs, 600);
       ok('its muscle label becomes a key', S.plans[0].exercises[0].muscle, 'chest');
       ok('its history is migrated too', S.history[0].exercises[0].durationSecs, 720);
+      // The first import left one workout behind and this file has none,
+      // which now asks first. That question is tested on its own below.
+      w.confirm=()=>true;
       w.applyImport(%s);
       ok('a current import is taken as is', w.eval('state').plans[0].exercises[1].durationSecs, 900);
       let threw=false; try{ w.applyImport({plans:'x'}); }catch(e){ threw=true; }
@@ -344,11 +347,69 @@ def test_import_of_an_old_export():
     report(drive(DEMO, body), "import")
 
 
+def test_import_asks_before_shrinking_history():
+    print("\nimport over a longer history (browser)")
+    if not browser():
+        skip("import confirmation", "no chromium found")
+        return
+    # An import replaces history wholesale and tp4_state is the only copy, so
+    # an older backup must not silently wipe the workouts logged since.
+    def workouts(n):
+        return [{"id": f"h{i}", "ts": f"2026-09-0{i + 1}T10:00:00Z", "exercises": []}
+                for i in range(n)]
+    have = json.loads(json.dumps(DEMO))
+    have["history"] = workouts(2)
+    older = json.loads(json.dumps(DEMO))
+    older["plans"][0]["name"] = "Older plan"
+    newer = json.loads(json.dumps(DEMO))
+    newer["history"] = workouts(3)
+    nohist = json.loads(json.dumps(DEMO))
+    del nohist["history"]
+    body = """
+      const older=%s, newer=%s, nohist=%s;
+      const saved=localStorage.getItem('tp4_state');
+      let asked=[], answer=false;
+      w.confirm=m=>{ asked.push(m); return answer; };
+      const clone=o=>JSON.parse(JSON.stringify(o));
+
+      let r=w.applyImport(clone(older));
+      ok('a file with fewer workouts asks first', asked.length, 1);
+      ok('the question names the count in the app', asked[0].includes('In this app: 2'), true);
+      ok('the question names the count in the file', asked[0].includes('In the file: 0'), true);
+      ok('declining reports it', r, false);
+      ok('declining keeps every workout', w.eval('state').history.length, 2);
+      ok('declining keeps the plans', w.eval('state').plans[0].name, 'Plan');
+      ok('declining saves nothing', localStorage.getItem('tp4_state'), saved);
+
+      w.eval("lang='de'"); asked=[];
+      w.applyImport(clone(older));
+      ok('the question is asked in German too', asked[0].includes('In der App: 2'), true);
+      w.eval("lang='en'");
+
+      asked=[];
+      w.applyImport(clone(nohist));
+      ok('a file without history asks nothing', asked.length, 0);
+      ok('and leaves history alone', w.eval('state').history.length, 2);
+
+      asked=[];
+      r=w.applyImport(clone(newer));
+      ok('a file with more workouts asks nothing', asked.length, 0);
+      ok('and is taken', w.eval('state').history.length, 3);
+
+      asked=[]; answer=true;
+      r=w.applyImport(clone(older));
+      ok('accepting reports it', r, true);
+      ok('accepting imports as before', w.eval('state').history.length, 0);
+      ok('accepting takes the plans too', w.eval('state').plans[0].name, 'Older plan');
+    """ % (json.dumps(older), json.dumps(newer), json.dumps(nohist))
+    report(drive(have, body), "import confirmation")
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
-              test_import_of_an_old_export):
+              test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
