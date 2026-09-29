@@ -18,10 +18,21 @@ Pick **one** improvement, to **one** of the two projects, and implement it.
 
 Choosing what:
 
-- Read recent `git log` in both repos for direction and for what was just
-  worked on.
-- Prefer something the owner would plausibly want: a rough edge, a missing
-  affordance, a case handled badly, a bug you can actually demonstrate.
+- Take it from the backlog. An hour earlier the scout (`SCOUT.md`) refreshed
+  a ranked list in `BACKLOG.md` on the `backlog` branch:
+
+  ```bash
+  git fetch origin backlog && git show origin/backlog:BACKLOG.md
+  ```
+
+  Build the **highest-ranked item under *Top ten*** that no open pull request
+  already carries as `Backlog: B-<n>`. Read *Owner notes* too.
+- If that item turns out, once you are in the code, to be wrong, already
+  done, or too big for one night, skip to the next and say why in your
+  report. Do not edit `BACKLOG.md`. The scout keeps it.
+- If the branch is missing or the list is empty, fall back to choosing
+  yourself: read recent `git log` in both repos, and prefer a rough edge, a
+  missing affordance, or a bug you can actually demonstrate.
 - One focused change. Not a refactor, not three things bundled together.
 - **If nothing is worth building tonight, write that and stop.** Do not invent
   busywork. A night that produces no branch is a good outcome, and much better
@@ -49,6 +60,12 @@ reading it over coffee who has not seen the code:
 - What you built, and why you thought it was worth building.
 - What you verified, and what you could not.
 - What you are unsure about, or would do differently with more context.
+- A last line `Backlog: B-<n>` naming the item, so the scout can tell it was
+  built. Leave it out if you chose without the backlog.
+
+A reviewer (`REVIEW.md`) goes over it in the morning and may push small fixes
+to your branch, so make the description checkable: say exactly how to
+reproduce what you fixed.
 
 Be honest about weaknesses. A pull request that oversells itself wastes the
 owner's morning, and the point of the draft is that merging is their decision,
