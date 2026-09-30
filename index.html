@@ -2397,7 +2397,21 @@ function doReorder(srcId,tgtId){
 }
 
 function changeExPhase(exId,phaseId){ const plan=getPlanById(editingPlanId),ex=plan.exercises.find(e=>e.id===exId); if(ex){ex.phaseId=phaseId||null;saveState();} }
-function deletePlanEx(exId){ if(!confirm(t('confirm.del-ex')))return; const plan=getPlanById(editingPlanId); plan.exercises=plan.exercises.filter(e=>e.id!==exId); saveState();renderPlanExercises(); }
+function deletePlanEx(exId){
+  if(!confirm(t('confirm.del-ex')))return;
+  const plan=getPlanById(editingPlanId);
+  plan.exercises=plan.exercises.filter(e=>e.id!==exId);
+  // The progress entry outlives the exercise otherwise. The ring then counts
+  // it as done against a smaller total and reads over 100%, and finishing the
+  // workout writes a history row claiming more exercises than the plan holds.
+  const prog=state.progress&&state.progress[editingPlanId];
+  if(prog){
+    if(prog.completedSets) delete prog.completedSets[exId];
+    if(prog.overrides) delete prog.overrides[exId];
+    prog.doneExercises=(prog.doneExercises||[]).filter(id=>id!==exId);
+  }
+  saveState(); renderPlanExercises(); updateProgress();
+}
 
 // ══════════════════════════════════════════════
 // ICON PICKERS

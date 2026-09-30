@@ -460,6 +460,36 @@ def test_stranded_data_is_repaired():
     report(drive(current, body2), "idempotence")
 
 
+def test_deleting_an_exercise_clears_its_progress():
+    print("\ndeleting an exercise (browser)")
+    if not browser():
+        skip("delete clears progress", "no chromium found")
+        return
+    done = json.loads(json.dumps(DEMO))
+    done["progress"] = {"p1": {"completedSets": {"x1": 3, "x2": 1},
+                               "doneExercises": ["x1", "x2"],
+                               "overrides": {"x1": {"kg": "70"}}}}
+    body = """
+      w.startWithPlan('p1');
+      ok('both exercises count as done', d.getElementById('prTxt').textContent, '100%');
+      w.openPlanDetail('p1'); w.showPlanTab('exercises');
+      // Stub confirm for BOTH deletes. A real one blocks headless forever.
+      const realConfirm=w.confirm; w.confirm=()=>true;
+      w.deletePlanEx('x2');
+      const P=w.eval('state').progress.p1;
+      ok('its completed sets are gone', P.completedSets.x2===undefined, true);
+      ok('it is off the done list', P.doneExercises.indexOf('x2'), -1);
+      ok('the surviving exercise keeps its progress', P.completedSets.x1, 3);
+      ok('its own override survives', P.overrides.x1.kg, '70');
+      ok('the ring does not overshoot', d.getElementById('prTxt').textContent, '100%');
+      w.deletePlanEx('x1');
+      w.confirm=realConfirm;
+      ok('deleting the last one clears it too', w.eval('state').progress.p1.doneExercises.length, 0);
+      ok('and the ring reads zero', d.getElementById('prTxt').textContent, '0%');
+    """
+    report(drive(done, body), "delete")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -568,7 +598,7 @@ def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
-              test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_user_text_cannot_inject_markup,
+              test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
