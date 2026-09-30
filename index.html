@@ -486,6 +486,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
   </div>
   <div id="stab-globalex" class="sub-screen">
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="gex-desc"></p>
+    <input class="s-inp" id="gex-filter" type="search" autocomplete="off"
+           style="margin-bottom:12px;display:none" oninput="renderGexList()">
     <div id="gex-list"></div>
     <button class="btn-outline" id="btn-new-gex" onclick="openAddGex()"></button>
   </div>
@@ -841,6 +843,7 @@ const T = {
     'time-ex':'Zeitübung','strength-ex':'Kraftübung',
     'timer':'TIMER','completed.min':'abgeschlossen',
     'lasttime':'Letztes Mal','personalbest':'Neuer Rekord',
+    'gex.filter':'Übungen filtern','gex.nomatch':'Keine Übung passt dazu.',
     'timer.start':'START','timer.pause':'PAUSE','timer.resume':'WEITER',
     'timer.again':'NOCHMAL','timer.finished':'FERTIG!',
     'sw.start':'Start','sw.stop':'Stopp',
@@ -933,6 +936,7 @@ const T = {
     'time-ex':'Timed exercise','strength-ex':'Strength exercise',
     'timer':'TIMER','completed.min':'completed',
     'lasttime':'Last time','personalbest':'New best',
+    'gex.filter':'Filter exercises','gex.nomatch':'No exercise matches.',
     'timer.start':'START','timer.pause':'PAUSE','timer.resume':'RESUME',
     'timer.again':'AGAIN','timer.finished':'DONE!',
     'sw.start':'Start','sw.stop':'Stop',
@@ -2523,10 +2527,33 @@ function selectIconPlanEx(el,icon){ document.querySelectorAll('#iconPickerPlanEx
 // ══════════════════════════════════════════════
 let editingGexId=null, gexType='reps';
 
+// Folded for matching: case, and accents, so that ruck finds Rücken. The
+// library is a flat list that only grows, and finding one entry used to mean
+// scrolling past every other.
+function foldForSearch(v){
+  return String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+}
+
 function renderGexList(){
   const list=document.getElementById('gex-list');
+  const box=document.getElementById('gex-filter');
+  // Pointless with nothing to filter, so it only appears once there is.
+  if(box){
+    box.style.display=state.globalExercises.length?'':'none';
+    box.placeholder=t('gex.filter');
+  }
   if(!state.globalExercises.length){ list.innerHTML=`<div class="empty-state" style="padding:30px 0"><div class="big">🏋️</div>${t('no-gex')}</div>`; return; }
-  list.innerHTML=state.globalExercises.map(gex=>`
+  const q=foldForSearch(box?box.value.trim():'');
+  // Name, the label shown in the current language, and the stored key, so
+  // Brust and chest both find a chest exercise whichever language is on.
+  const shown=q?state.globalExercises.filter(g=>
+    [g.name, muscleLabel(g.muscle), g.muscle].some(v=>foldForSearch(v).indexOf(q)>=0)
+  ):state.globalExercises;
+  if(!shown.length){
+    list.innerHTML=`<div class="empty-state" style="padding:24px 0">${t('gex.nomatch')}</div>`;
+    return;
+  }
+  list.innerHTML=shown.map(gex=>`
     <div class="gex-item" id="gex-${gex.id}">
       <div class="gex-header" onclick="toggleGex('${gex.id}')">
         <div class="gex-title"><span>${escHtml(gex.icon)}</span><span>${escHtml(gex.name)}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${escHtml(muscleLabel(gex.muscle))}</span></div>

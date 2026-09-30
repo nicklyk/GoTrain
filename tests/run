@@ -645,6 +645,52 @@ def test_rest_can_be_adjusted_while_running():
     report(drive(DEMO, body), "rest adjust")
 
 
+def test_the_library_can_be_filtered():
+    print("\nlibrary filter (browser)")
+    if not browser():
+        skip("library filter", "no chromium found")
+        return
+    lib = json.loads(json.dumps(DEMO))
+    lib["lang"] = "de"
+    g = lambda i, n, m: {"id": i, "icon": "1", "name": n, "muscle": m, "type": "reps",
+                         "sets": 3, "reps": "10", "kg": "", "pauseSecs": None,
+                         "durationSecs": 300, "note": ""}
+    # Not "Bankdrücken": it folds to "bankdrucken", which contains "ruck",
+    # so it would rightly match the accent test below.
+    lib["globalExercises"] = [g("a", "Butterfly", "chest"),
+                              g("b", "Rückenstrecker", "back"),
+                              g("c", "Kniebeuge", "legs")]
+    body = """
+      w.showScreen('settings'); w.showSettingsTab('globalex');
+      const box=d.getElementById('gex-filter');
+      const names=()=>[...d.querySelectorAll('#gex-list .gex-title span:nth-child(2)')].map(e=>e.textContent);
+      const find=q=>{ box.value=q; w.renderGexList(); return names(); };
+
+      ok('the filter is offered once there is a library', box.style.display, '');
+      ok('everything shows with no query', names().length, 3);
+      ok('it narrows on the name', JSON.stringify(find('knie')), JSON.stringify(['Kniebeuge']));
+      ok('case does not matter', JSON.stringify(find('KNIE')), JSON.stringify(['Kniebeuge']));
+      ok('an accentless query finds an accented name',
+         JSON.stringify(find('ruck')), JSON.stringify(['Rückenstrecker']));
+      // Matched on the label in the current language, here German.
+      ok('it matches the muscle label', JSON.stringify(find('brust')), JSON.stringify(['Butterfly']));
+      ok('and the stored key', JSON.stringify(find('legs')), JSON.stringify(['Kniebeuge']));
+      find('zzz');
+      ok('no match says so rather than looking empty',
+         d.getElementById('gex-list').textContent.indexOf('Keine') >= 0, true);
+      ok('clearing restores everything', find('').length, 3);
+    """
+    report(drive(lib, body), "filter")
+
+    empty = json.loads(json.dumps(DEMO))
+    body2 = """
+      w.showScreen('settings'); w.showSettingsTab('globalex');
+      ok('no filter box when the library is empty',
+         d.getElementById('gex-filter').style.display, 'none');
+    """
+    report(drive(empty, body2), "filter empty")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -756,7 +802,7 @@ def main():
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
               test_adjusting_keeps_a_hand_completed_exercise_done,
               test_last_time_is_shown, test_a_personal_best_is_marked,
-              test_rest_can_be_adjusted_while_running, test_user_text_cannot_inject_markup,
+              test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
