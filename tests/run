@@ -597,6 +597,44 @@ def test_a_personal_best_is_marked():
     run("60", [], "a first-ever session is not", False)
 
 
+def test_rest_can_be_adjusted_while_running():
+    print("\nadjusting the rest (browser)")
+    if not browser():
+        skip("rest adjust", "no chromium found")
+        return
+    body = """
+      const REAL=Date.now(); let off=0;
+      w.Date.now=()=>REAL+off;
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      const num=()=>d.getElementById('tovNum').textContent;
+      const up=()=>d.getElementById('timerOverlay').classList.contains('active');
+
+      w.startWithPlan('p1'); w.openDetail('x1');
+      w.startPauseTimer(75);
+      w.adjustRest(30);
+      ok('+30 adds to the remaining time', num(), 105);
+      w.adjustRest(-30); w.adjustRest(-30);
+      ok('-30 takes it away', num(), 45);
+
+      // The deadline moved, not a counter, so it still catches up after a lock.
+      off=20000; w.tickAll();
+      ok('an adjusted rest still follows the clock', num(), 25);
+
+      w.adjustRest(-30);
+      ok('shortening past zero ends the rest', up(), false);
+
+      // With no rest running there is nothing to adjust, and nothing breaks.
+      w.adjustRest(30);
+      ok('adjusting with no rest running is a no-op', up(), false);
+
+      // Extending past the original length keeps the ring within bounds.
+      off=0; w.startPauseTimer(60); w.adjustRest(30);
+      const dash=parseFloat(d.getElementById('tovBar').style.strokeDashoffset);
+      ok('the ring is not drawn past full', dash>=0, true);
+    """
+    report(drive(DEMO, body), "rest adjust")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -707,7 +745,8 @@ def main():
               test_timers_survive_a_locked_screen, test_duration_migration,
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
               test_adjusting_keeps_a_hand_completed_exercise_done,
-              test_last_time_is_shown, test_a_personal_best_is_marked, test_user_text_cannot_inject_markup,
+              test_last_time_is_shown, test_a_personal_best_is_marked,
+              test_rest_can_be_adjusted_while_running, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")

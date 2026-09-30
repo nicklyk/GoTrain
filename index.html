@@ -253,6 +253,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .tov-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:54px;color:var(--accent)}
 .tov-next{font-size:13px;color:var(--muted);text-align:center}
 .tov-next strong{color:var(--text)}
+.tov-adjust{display:flex;gap:12px}
+.tov-step{background:transparent;border:1px solid #3a3a45;color:var(--text);border-radius:var(--radius);font-size:15px;font-weight:600;padding:10px 22px;cursor:pointer;font-variant-numeric:tabular-nums}
 .tov-skip{background:var(--surface);border:1px solid #2a2a33;color:var(--text);border-radius:var(--radius);font-size:15px;font-weight:500;padding:12px 36px;cursor:pointer}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid #2a2a33;display:flex;padding:14px 0 36px;z-index:100}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;transition:color .2s}
@@ -577,6 +579,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
     <div class="tov-num" id="tovNum">75</div>
   </div>
   <div class="tov-next" id="tovNext"></div>
+  <div class="tov-adjust">
+    <button class="tov-step" id="tov-less" onclick="adjustRest(-30)">−30s</button>
+    <button class="tov-step" id="tov-more" onclick="adjustRest(30)">+30s</button>
+  </div>
   <button class="tov-skip" id="tov-skip" onclick="skipTimer()"></button>
 </div>
 
@@ -2107,6 +2113,22 @@ function clearRestTimer(){
   const ov=document.getElementById('timerOverlay'); if(ov) ov.classList.remove('active');
 }
 function skipTimer(){ clearRestTimer(); }
+// Seventy-five seconds is right until the set that was not, and the only
+// choices used to be waiting it out or skipping it and losing the count.
+// The rest is a deadline since v19, so this moves the deadline -- and it
+// stays correct across a locked screen for the same reason the timer does.
+function adjustRest(deltaSecs){
+  const r=timers.rest; if(!r) return;
+  const rem=Math.max(0,(r.endAt-Date.now())/1000)+deltaSecs;
+  if(rem<=0){ r.endAt=Date.now(); }       // shortened past zero: done now
+  else {
+    r.endAt=Date.now()+rem*1000;
+    // Keep the ring meaningful: extending past the original length would
+    // otherwise draw it more than full.
+    if(rem>r.total) r.total=rem;
+  }
+  saveTimers(); renderRestTimer();
+}
 function renderRestTimer(){
   const r=timers.rest, ov=document.getElementById('timerOverlay');
   if(!r||!ov) return;
