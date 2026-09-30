@@ -14,9 +14,13 @@ unless you choose to move it.
 
 - **Training plans** — create, copy, rename and delete as many as you like
 - **Phases** — group exercises into colour-coded blocks (Warm Up, Strength, Cool Down…)
-- **Exercise library** — define exercises once with a muscle group and reuse them
+- **Exercise library** — define exercises once with a muscle group and reuse
+  them, with a filter that ignores case and accents
 - **Reps or time** — sets and reps, or a countdown for timed exercises
-- **Live tracking** — tick off sets, rest timer between sets, stopwatch per set
+- **Live tracking** — tick off sets, rest timer between sets that you can
+  lengthen or shorten while it runs, stopwatch per set
+- **Last time** — each exercise shows what you lifted in the previous session,
+  and flags it when today's weight would be a new best
 - **History** — every finished session is saved with its full exercise detail
 - **Progress** — the weight you set per exercise is kept with each session, so
   your load over time is recorded, not just that you turned up
