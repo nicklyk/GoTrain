@@ -404,6 +404,16 @@ def test_user_text_cannot_inject_markup():
       ok('settings shows the plan name literally',
          d.querySelector('.card-name').textContent, 'Push <Heavy> & Pull');
 
+      // The exercise library prints the muscle label, and muscleLabel hands
+      // back an unrecognised value verbatim -- so it is user text too. This
+      // surface was missed the first time round.
+      w.showScreen('settings'); w.showSettingsTab('globalex');
+      const lib = d.querySelector('#gex-list .gex-title');
+      ok('the library shows the muscle literally',
+         lib.textContent.indexOf('<i>Brust</i>') >= 0, true);
+      ok('the library parsed no element out of it',
+         lib.querySelectorAll('i').length, 0);
+
       w.showScreen('history'); w.openHistoryDetail('h1');
       const hd = d.querySelector('.hd-ex-name');
       ok('history shows the name literally',
