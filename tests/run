@@ -217,7 +217,12 @@ def drive(state, body, timeout=90):
     with tempfile.TemporaryDirectory() as d:
         work = Path(d)
         shutil.copy(INDEX, work / "index.html")
-        (work / "driver.html").write_text(DRIVER % {"state": json.dumps(state), "body": body})
+        # A literal </script> anywhere in the state -- an exercise note, say --
+        # would close the inline script tag that embeds it and break the whole
+        # driver silently. Escaping the slash keeps the JSON identical to the
+        # parser while hiding the tag from the HTML tokenizer.
+        embedded = json.dumps(state).replace("</", "<\\/")
+        (work / "driver.html").write_text(DRIVER % {"state": embedded, "body": body})
         srv = subprocess.Popen([sys.executable, "-m", "http.server", "8771", "--bind", "127.0.0.1"],
                                cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
@@ -349,6 +354,62 @@ def test_quoted_text_survives_editing():
     report(drive(quoted, body), "quotes")
 
 
+def test_user_text_cannot_inject_markup():
+    print("\nmarkup in user text (browser)")
+    if not browser():
+        skip("markup escaping", "no chromium found")
+        return
+    # Names and notes arrive from an imported file. Unescaped, one can put an
+    # event handler into the page, and this app's whole claim is that it makes
+    # no network requests -- which a single injected tag would break.
+    evil = json.loads(json.dumps(DEMO))
+    plan = evil["plans"][0]
+    plan["name"] = 'Push <Heavy> & Pull'
+    plan["phases"][0]["name"] = 'Warm <b>up</b>'
+    plan["exercises"][0]["name"] = '<img src=x onerror="window.__pwned=1">'
+    plan["exercises"][0]["note"] = '<script>window.__pwned=2</script>'
+    plan["exercises"][0]["kg"] = '<b>60</b>'
+    plan["exercises"][0]["muscle"] = '<i>Brust</i>'
+    evil["globalExercises"] = [dict(plan["exercises"][0], id="g1")]
+    evil["history"] = [{"id": "h1", "ts": "2026-09-01T10:00:00Z",
+                        "plan": 'Push <Heavy> & Pull', "planId": "p1",
+                        "totalExercises": 1, "doneExercises": 1, "totalSets": 3,
+                        "exercises": [dict(plan["exercises"][0], setsCompleted=3, done=True)]}]
+    body = """
+      // Every surface that renders a name, a note or a weight.
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      w.showSettingsTab('globalex');
+      w.showScreen('workout'); w.startWithPlan('p1');
+      w.openDetail('x1');
+      w.showScreen('history'); w.openHistoryDetail('h1');
+      w.openPlanDetail('p1'); w.showPlanTab('exercises'); w.showPlanTab('phases');
+
+      ok('no injected handler ran', String(w.__pwned), 'undefined');
+      ok('no img element was created', d.querySelectorAll('img').length, 0);
+      ok('no script landed in the rendered content', d.querySelectorAll('#app-scroll script').length, 0);
+
+      // Text, not markup: each surface shows the characters and parses no
+      // elements out of them. textContent rather than innerText, which only
+      // reports what happens to be visible.
+      w.openPlanDetail('p1'); w.showPlanTab('exercises');
+      const row = d.querySelector('.plan-ex-name');
+      ok('plan editor shows the name literally',
+         row.textContent.indexOf('<img src=x onerror=') >= 0, true);
+      ok('plan editor parsed no element out of it', row.querySelectorAll('*').length, 0);
+
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      ok('settings shows the plan name literally',
+         d.querySelector('.card-name').textContent, 'Push <Heavy> & Pull');
+
+      w.showScreen('history'); w.openHistoryDetail('h1');
+      const hd = d.querySelector('.hd-ex-name');
+      ok('history shows the name literally',
+         hd.textContent.indexOf('<img src=x onerror=') >= 0, true);
+      ok('history parsed no element out of it', hd.querySelectorAll('*').length, 0);
+    """
+    report(drive(evil, body), "escaping")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -456,7 +517,7 @@ def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
-              test_quoted_text_survives_editing,
+              test_quoted_text_survives_editing, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
