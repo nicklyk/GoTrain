@@ -1102,7 +1102,7 @@ function muscleSelectHTML(id, currentVal){
     `<option value="${k}" ${k===cur?'selected':''}>${muscleLabel(k)}</option>`).join('');
   // Keep an unrecognised stored value selectable rather than dropping it.
   if(cur && MUSCLE_KEYS.indexOf(cur)<0)
-    opts += `<option value="${cur}" selected>${cur}</option>`;
+    opts += `<option value="${escAttr(cur)}" selected>${cur}</option>`;
   return `<select class="s-inp" id="${id}"><option value="" ${!cur?'selected':''}>–</option>${opts}</select>`;
 }
 
@@ -1301,6 +1301,15 @@ function unsetDone(exId){ const p=getProg(state.activePlanId); p.doneExercises=p
 function pauseFor(ex){ return (ex.pauseSecs!=null&&ex.pauseSecs!=='')? parseInt(ex.pauseSecs):state.globalPauseSecs; }
 function fmtTime(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function fmtDur(secs){ return fmtTime(Math.max(0,Math.round(Number(secs)||0))); }
+// Text going into a value="" attribute has to have its quotes escaped, or a
+// name like  Core "hard"  closes the attribute early and everything after the
+// quote is dropped -- silently, and only when the field is next opened and
+// saved. Ampersands go first so the other replacements are not double-encoded.
+function escAttr(v){
+  return String(v==null?'':v)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 // Timed exercises fall back to five minutes, which is what the old
 // durationMin default was.
 function exDurSecs(ex){ return ex&&ex.durationSecs!=null?ex.durationSecs:300; }
@@ -1696,7 +1705,7 @@ function openAdjust(){
     const control=f.type==='duration'
       ? `<button class="dur-field" id="adj-${f.key}" onclick="durFieldOpen('adj-${f.key}',t('${f.label}'),false,0)"></button>`
       : `<input class="s-inp" id="adj-${f.key}" type="${f.type}" inputmode="decimal"
-             value="${ex[f.key]===undefined?'':ex[f.key]}">`;
+             value="${escAttr(ex[f.key]===undefined?'':ex[f.key])}">`;
     return `<div class="s-row">
       <div class="s-lbl">${t(f.label)}
         <div class="g-sub">${t('adjust.plan')} ${planVal}</div>
@@ -2138,7 +2147,7 @@ function renderPhaseEditor(){
         <div style="display:flex;align-items:center;flex:1;min-width:0">
           <span class="phase-color-dot pdot-${pi%PHASE_COLORS}"></span>
           <input style="background:transparent;border:none;outline:none;color:var(--text);font-family:var(--font-display);font-size:17px;letter-spacing:1px;width:100%"
-            value="${phase.name}" onblur="renamePhase('${phase.id}',this.value)">
+            value="${escAttr(phase.name)}" onblur="renamePhase('${phase.id}',this.value)">
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           <span style="font-size:11px;color:var(--muted)">${exCount} ${t('exercises.abbr')}</span>
@@ -2488,23 +2497,23 @@ function openCustomizeExModal(data,btnLabel,isNew){
     </div>
     <div class="s-row-2">
       <div class="s-row"><div class="s-lbl">${t('field.muscle')}</div>${muscleSelectHTML('mce-muscle', data.muscle||'')}</div>
-      <div class="s-row"><div class="s-lbl">${t('field.name')}</div><input class="s-inp" id="mce-name" value="${data.name||''}"></div>
+      <div class="s-row"><div class="s-lbl">${t('field.name')}</div><input class="s-inp" id="mce-name" value="${escAttr(data.name||'')}"></div>
     </div>
     <div id="mce-reps-fields" style="${curType==='time'?'display:none':''}">
       <div class="s-row-2">
-        <div class="s-row"><div class="s-lbl">${t('field.reps')}</div><input class="s-inp" id="mce-reps" value="${data.reps||''}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.reps')}</div><input class="s-inp" id="mce-reps" value="${escAttr(data.reps||'')}"></div>
         <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" min="1" value="${data.sets||3}"></div>
       </div>
       <div class="s-row-2">
-        <div class="s-row"><div class="s-lbl">${t('field.seatheight')}</div><input class="s-inp" id="mce-sitz" value="${data.sithoehe||''}"></div>
-        <div class="s-row"><div class="s-lbl">${t('field.weight')}</div><input class="s-inp" id="mce-kg" value="${data.kg||''}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.seatheight')}</div><input class="s-inp" id="mce-sitz" value="${escAttr(data.sithoehe||'')}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.weight')}</div><input class="s-inp" id="mce-kg" value="${escAttr(data.kg||'')}"></div>
       </div>
       <div class="s-row"><div class="s-lbl">${t('field.pause')}</div><button class="dur-field" id="mce-pause" onclick="durFieldOpen('mce-pause',t('field.pause'),true,state.globalPauseSecs)"></button></div>
     </div>
     <div id="mce-time-fields" style="${curType==='time'?'':'display:none'}">
       <div class="s-row"><div class="s-lbl">${t('field.duration')}</div><button class="dur-field" id="mce-dur" onclick="durFieldOpen('mce-dur',t('field.duration'),false,0)"></button></div>
     </div>
-    <div class="s-row"><div class="s-lbl">${t('field.note')}</div><input class="s-inp" id="mce-note" value="${data.note||''}"></div>
+    <div class="s-row"><div class="s-lbl">${t('field.note')}</div><input class="s-inp" id="mce-note" value="${escAttr(data.note||'')}"></div>
     <div class="s-row"><div class="s-lbl">${t('field.phase')}</div><select class="s-inp" id="mce-phase">${phaseOpts}</select></div>`;
   // The two duration buttons carry their value in a data attribute, so they
   // are filled after the template lands rather than interpolated into it.

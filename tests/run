@@ -312,6 +312,43 @@ def test_duration_migration():
     report(drive(old, body), "migration")
 
 
+def test_quoted_text_survives_editing():
+    print("\nquotes in user text (browser)")
+    if not browser():
+        skip("quoted text", "no chromium found")
+        return
+    # A double quote ends a value="" attribute early, so everything after it is
+    # dropped -- and only when the field is next opened and saved, which makes
+    # it look like the app ate the text at random.
+    quoted = json.loads(json.dumps(DEMO))
+    plan = quoted["plans"][0]
+    plan["phases"][0]["name"] = 'Core "hard"'
+    plan["exercises"][0]["name"] = 'Bench "flat"'
+    plan["exercises"][0]["note"] = 'Seat "3", pad low'
+    plan["exercises"][0]["kg"] = '60 "plates"'
+    body = """
+      w.openPlanDetail('p1'); w.showPlanTab('phases');
+      const pi=d.querySelector('#ptab-phases input');
+      ok('phase name renders whole', pi.value, 'Core \\"hard\\"');
+      w.renamePhase('ph', pi.value);
+      ok('phase name survives a save', w.eval('state').plans[0].phases[0].name, 'Core \\"hard\\"');
+
+      w.showPlanTab('exercises'); w.openEditPlanEx('x1');
+      ok('exercise name renders whole', d.getElementById('mce-name').value, 'Bench \\"flat\\"');
+      ok('note renders whole', d.getElementById('mce-note').value, 'Seat \\"3\\", pad low');
+      ok('weight renders whole', d.getElementById('mce-kg').value, '60 \\"plates\\"');
+      w.savePlanEx();
+      const e=w.eval('state').plans[0].exercises.find(x=>x.id==='x1');
+      ok('exercise name survives an unchanged save', e.name, 'Bench \\"flat\\"');
+      ok('note survives an unchanged save', e.note, 'Seat \\"3\\", pad low');
+
+      w.startWithPlan('p1'); w.openDetail('x1'); w.openAdjust();
+      ok('adjust-for-today shows the whole weight',
+         d.getElementById('adj-kg').value, '60 \\"plates\\"');
+    """
+    report(drive(quoted, body), "quotes")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -419,6 +456,7 @@ def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
+              test_quoted_text_survives_editing,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
