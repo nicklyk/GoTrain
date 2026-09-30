@@ -207,6 +207,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .back-btn{background:var(--surface);border:1px solid #2a2a33;color:var(--text);border-radius:12px;width:40px;height:40px;min-width:40px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer}
 .detail-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;line-height:1.1}
 .detail-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.last-time{background:var(--surface);border:1px solid #2a2a33;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lt-label{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase}
+.lt-val{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.lt-best{color:var(--accent);font-weight:600}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
 .info-box{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:12px}
 .ib-label{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
@@ -459,6 +463,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
   </div>
   <div class="info-grid" id="d-info"></div>
   <div class="note-box" id="d-note" style="display:none"></div>
+  <div class="last-time" id="d-last" style="display:none"></div>
   <div class="sec-label" id="lbl-sets-timer">SÄTZE / TIMER</div>
   <div id="d-sets"></div>
   <div id="next-ex-slot"></div>
@@ -829,6 +834,7 @@ const T = {
     'timer.lbl':'PAUSE · NÄCHSTER SATZ IN','skip':'Überspringen',
     'time-ex':'Zeitübung','strength-ex':'Kraftübung',
     'timer':'TIMER','completed.min':'abgeschlossen',
+    'lasttime':'Letztes Mal','personalbest':'Neuer Rekord',
     'timer.start':'START','timer.pause':'PAUSE','timer.resume':'WEITER',
     'timer.again':'NOCHMAL','timer.finished':'FERTIG!',
     'sw.start':'Start','sw.stop':'Stopp',
@@ -920,6 +926,7 @@ const T = {
     'timer.lbl':'REST · NEXT SET IN','skip':'Skip',
     'time-ex':'Timed exercise','strength-ex':'Strength exercise',
     'timer':'TIMER','completed.min':'completed',
+    'lasttime':'Last time','personalbest':'New best',
     'timer.start':'START','timer.pause':'PAUSE','timer.resume':'RESUME',
     'timer.again':'AGAIN','timer.finished':'DONE!',
     'sw.start':'Start','sw.stop':'Stop',
@@ -1698,6 +1705,7 @@ function openDetail(exId){
     h+=`<div class="info-box"><div class="ib-label">${t('gs.pause.lbl')}</div><div class="ib-val">${fmtDur(pauseFor(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
     grid.innerHTML=h;
   }
+  renderLastTime(ex);
   const noteEl=document.getElementById('d-note');
   const notes=[];
   if(isAdjusted(exId)) notes.push('✏️  '+t('adjust.active'));
@@ -1807,6 +1815,59 @@ function resetAdjust(){
   saveState(); updateProgress();
   closeModal('modalAdjust');
   openDetail(currentExId);
+}
+
+// The last finished session that contained this exercise. Matched on id
+// first and then on name, because deleting an exercise and adding it back
+// gives it a new id while it is plainly the same movement to the person
+// doing it. History is stored newest first, so the first hit is the answer.
+function lastSessionFor(ex){
+  if(!ex) return null;
+  const name=String(ex.name||'').trim().toLowerCase();
+  for(const entry of (state.history||[])){
+    for(const row of (entry.exercises||[])){
+      if(!row) continue;
+      const sameName=String(row.name||'').trim().toLowerCase();
+      if(row.id===ex.id||(name&&sameName===name)) return {entry, row};
+    }
+  }
+  return null;
+}
+
+// Was this the heaviest that exercise has ever been? Weight only: reps and
+// durations are not comparable once the set count differs.
+function isPersonalBest(ex){
+  const now=parseFloat(String(ex&&ex.kg||'').replace(',','.'));
+  if(!isFinite(now)||now<=0) return false;
+  const name=String(ex.name||'').trim().toLowerCase();
+  let seen=false, best=0;
+  (state.history||[]).forEach(entry=>(entry.exercises||[]).forEach(row=>{
+    if(!row) return;
+    const sameName=String(row.name||'').trim().toLowerCase();
+    if(row.id!==ex.id&&!(name&&sameName===name)) return;
+    const v=parseFloat(String(row.kg||'').replace(',','.'));
+    if(isFinite(v)&&v>0){ seen=true; best=Math.max(best,v); }
+  }));
+  return seen&&now>best;
+}
+
+function renderLastTime(ex){
+  const box=document.getElementById('d-last'); if(!box) return;
+  const prev=lastSessionFor(ex);
+  if(!prev){ box.style.display='none'; box.innerHTML=''; return; }
+  const row=prev.row, bits=[];
+  if(row.type==='time'){
+    if(row.durationSecs!=null) bits.push(fmtDur(row.durationSecs));
+  } else {
+    if(row.kg) bits.push(escHtml(row.kg)+' kg');
+    const sets=row.setsCompleted||row.sets;
+    if(sets) bits.push(escHtml(String(sets))+(row.reps?'\u00d7'+escHtml(row.reps):''));
+  }
+  bits.push(escHtml(entryDate(prev.entry)));
+  box.innerHTML=`<span class="lt-label">${t('lasttime')}</span>`
+    + bits.map(b=>`<span class="lt-val">${b}</span>`).join('<span>\u00b7</span>')
+    + (isPersonalBest(ex)?`<span class="lt-best">\u2605 ${t('personalbest')}</span>`:'');
+  box.style.display='';
 }
 
 function setCountOf(exId){ const ex=getEx(exId); return ex?parseInt(ex.sets,10)||0:0; }

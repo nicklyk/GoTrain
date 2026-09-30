@@ -527,6 +527,76 @@ def test_adjusting_keeps_a_hand_completed_exercise_done():
     report(drive(DEMO, body), "adjust")
 
 
+def _with_history(sessions):
+    st = json.loads(json.dumps(DEMO))
+    st["history"] = sessions
+    return st
+
+
+def _session(sid, ts, kg, sets=3, reps="8", name="Bench", exid="x1"):
+    return {"id": sid, "ts": ts, "plan": "Plan", "planId": "p1",
+            "totalExercises": 1, "doneExercises": 1, "totalSets": sets,
+            "exercises": [{"id": exid, "name": name, "muscle": "chest",
+                           "type": "reps", "sets": sets, "reps": reps, "kg": kg,
+                           "setsCompleted": sets, "done": True}]}
+
+
+def test_last_time_is_shown():
+    print("\nlast time (browser)")
+    if not browser():
+        skip("last time", "no chromium found")
+        return
+    # Newest first, the way the app stores history.
+    st = _with_history([_session("s2", "2026-09-12T18:00:00Z", "60"),
+                        _session("s1", "2026-09-05T18:00:00Z", "55")])
+    body = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      const box=d.getElementById('d-last');
+      ok('the panel is shown', box.style.display !== 'none', true);
+      ok('it reports the most recent session, not the oldest',
+         box.textContent.indexOf('60 kg') >= 0, true);
+      ok('it does not report the older one', box.textContent.indexOf('55 kg'), -1);
+      ok('it shows the set shape', box.textContent.indexOf('3\u00d78') >= 0, true);
+
+      // An exercise never done before has nothing to say.
+      w.openDetail('x2');
+      ok('a first-ever exercise shows nothing',
+         d.getElementById('d-last').style.display, 'none');
+    """
+    report(drive(st, body), "last time")
+
+    # Matched by name as well as id, since deleting and re-adding an exercise
+    # gives it a new id while remaining the same movement.
+    renamed = _with_history([_session("s1", "2026-09-05T18:00:00Z", "52", exid="gone")])
+    body2 = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      ok('a re-created exercise still finds its history',
+         d.getElementById('d-last').textContent.indexOf('52 kg') >= 0, true);
+    """
+    report(drive(renamed, body2), "last time by name")
+
+
+def test_a_personal_best_is_marked():
+    print("\npersonal best (browser)")
+    if not browser():
+        skip("personal best", "no chromium found")
+        return
+    def run(kg_now, past, label, expect):
+        st = _with_history(past)
+        st["plans"][0]["exercises"][0]["kg"] = kg_now
+        body = """
+          w.startWithPlan('p1'); w.openDetail('x1');
+          ok('%s', d.getElementById('d-last').textContent.indexOf('\u2605') >= 0, %s);
+        """ % (label, "true" if expect else "false")
+        report(drive(st, body), label)
+
+    past = [_session("s1", "2026-09-05T18:00:00Z", "55")]
+    run("60", past, "heavier than before is marked", True)
+    run("55", past, "equalling it is not", False)
+    run("50", past, "lighter is not", False)
+    run("60", [], "a first-ever session is not", False)
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -636,7 +706,8 @@ def main():
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
-              test_adjusting_keeps_a_hand_completed_exercise_done, test_user_text_cannot_inject_markup,
+              test_adjusting_keeps_a_hand_completed_exercise_done,
+              test_last_time_is_shown, test_a_personal_best_is_marked, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
