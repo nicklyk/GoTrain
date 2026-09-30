@@ -26,7 +26,8 @@ Choosing what:
   ```
 
   Build the **highest-ranked item under *Top ten*** that no open pull request
-  already carries as `Backlog: B-<n>`. Read *Owner notes* too.
+  already carries as `Backlog: B-<n>`, and that no commit on `main` carries
+  either (`git log origin/main --grep 'Backlog: B-<n>'` in both repos). Read *Owner notes* too.
 - If that item turns out, once you are in the code, to be wrong, already
   done, or too big for one night, skip to the next and say why in your
   report. Do not edit `BACKLOG.md`. The scout keeps it.

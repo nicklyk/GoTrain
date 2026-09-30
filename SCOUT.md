@@ -42,8 +42,9 @@ The owner edits this file by hand on GitHub. Before changing anything, read
 1. Read recent `git log` in both repos, and the open and recently closed pull
    requests in both.
 2. Remove items that were built. An item was built when a pull request carries
-   `Backlog: B-<n>` in its description and is **open or merged**. Record
-   merged ones under **Done**. If such a PR was **closed without merging**,
+   `Backlog: B-<n>` in its description and is **open or merged**, or when a
+   commit on either repository's `main` carries that line (work the owner
+   merged without a PR). Record merged ones under **Done**. If such a PR was **closed without merging**,
    move the item to **Not wanted**: the owner said no.
 3. Re-rank what is left, and fill back up to ten with new candidates, found
    by actually reading the code: a rough edge, a missing affordance, a case
