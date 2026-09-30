@@ -310,7 +310,7 @@ def test_duration_migration():
     old["plans"][0]["exercises"][0]["durationMin"] = "12"
     body = """
       const S=JSON.parse(localStorage.getItem('tp4_state'));
-      ok('schema moves to 3', S.schema, 3);
+      ok('schema reaches the current version', S.schema, 4);
       ok('a range collapses to its first number', S.plans[0].exercises[1].durationSecs, 300);
       ok('a plain value converts', S.plans[0].exercises[0].durationSecs, 720);
     """
@@ -413,13 +413,61 @@ def test_user_text_cannot_inject_markup():
     report(drive(evil, body), "escaping")
 
 
+def test_stranded_data_is_repaired():
+    print("\nrepair of stranded data (browser)")
+    if not browser():
+        skip("stale repair", "no chromium found")
+        return
+    # What the import bug left behind: schema 3 written over data that was
+    # never migrated, so both earlier migrations skip it for good.
+    stale = json.loads(json.dumps(DEMO))
+    stale["schema"] = 3
+    ex = stale["plans"][0]["exercises"]
+    ex[0]["muscle"] = "Brust"
+    ex[1].pop("durationSecs")
+    ex[1]["durationMin"] = "10"
+    ex[1]["muscle"] = "Ausdauer"
+    stale["globalExercises"] = [{"id": "g1", "name": "Gx", "muscle": "Rücken",
+                                 "type": "time", "durationMin": "7"}]
+    stale["history"] = [{"id": "h1", "ts": "2026-09-01T10:00:00Z", "plan": "P",
+                         "exercises": [{"id": "x2", "name": "Row", "muscle": "Beine",
+                                        "type": "time", "durationMin": "20-30"}]}]
+    stale["progress"] = {"p1": {"completedSets": {}, "doneExercises": [],
+                                "overrides": {"x2": {"durationMin": "3"}}}}
+    body = """
+      const S=JSON.parse(localStorage.getItem('tp4_state'));
+      ok('schema advances', S.schema, 4);
+      ok('a stranded duration is filled', S.plans[0].exercises[1].durationSecs, 600);
+      ok('a stranded muscle becomes a key', S.plans[0].exercises[0].muscle, 'chest');
+      ok('the exercise library is repaired too', S.globalExercises[0].durationSecs, 420);
+      ok('history is repaired too', S.history[0].exercises[0].durationSecs, 1200);
+      ok('a history muscle becomes a key', S.history[0].exercises[0].muscle, 'legs');
+      ok('a session override is repaired', S.progress.p1.overrides.x2.durationSecs, 180);
+      ok('nothing already correct was disturbed', S.plans[0].exercises[0].durationSecs, 300);
+      ok('no field was dropped', S.plans[0].exercises[1].durationMin, '10');
+    """
+    report(drive(stale, body), "repair")
+
+    # Idempotent: a state already at 4 comes back byte-identical.
+    current = json.loads(json.dumps(DEMO))
+    current["schema"] = 4
+    body2 = """
+      const before = %s;
+      const S = JSON.parse(localStorage.getItem('tp4_state'));
+      ok('an already-current state is untouched',
+         JSON.stringify(S), JSON.stringify(before));
+    """ % json.dumps(current)
+    report(drive(current, body2), "idempotence")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
         skip("import migration", "no chromium found")
         return
     # Exports written before 2026-09-10 have no schema field. Importing one
-    # into a current install must still migrate it, not inherit schema 3.
+    # into a current install must still migrate it, not inherit the
+    # running schema.
     old = json.loads(json.dumps(DEMO))
     del old["schema"]
     for e in old["plans"][0]["exercises"]:
@@ -433,7 +481,7 @@ def test_import_of_an_old_export():
     body = """
       w.applyImport(%s);
       const S=w.eval('state');
-      ok('an old import reaches schema 3', S.schema, 3);
+      ok('an old import reaches the current schema', S.schema, 4);
       ok('its timed exercise keeps its length', S.plans[0].exercises[1].durationSecs, 600);
       ok('its muscle label becomes a key', S.plans[0].exercises[0].muscle, 'chest');
       ok('its history is migrated too', S.history[0].exercises[0].durationSecs, 720);
@@ -520,7 +568,7 @@ def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
-              test_quoted_text_survives_editing, test_user_text_cannot_inject_markup,
+              test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")

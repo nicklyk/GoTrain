@@ -1159,6 +1159,47 @@ function migrateDurations(st){
   return touched>0;
 }
 
+// Schema 4 repairs what the import bug left behind. Anyone who imported an
+// export with no schema field, before applyImport learned to treat that as
+// the oldest, ended up with schema 3 written over unmigrated data: durations
+// still in durationMin, muscles still German labels. Both migrations above
+// skip at their own threshold, so nothing would ever have fixed it.
+//
+// Deliberately additive and idempotent -- it fills durationSecs only where it
+// is missing and re-runs muscleKey, which passes a key through unchanged. It
+// drops no field, so running it over already-current data is a no-op and
+// running it twice changes nothing.
+function migrateStale(st){
+  if(st.schema>=4) return false;
+  let touched=0;
+  const toSecs=v=>{
+    const first=parseFloat(String(v==null?'5':v).replace(',','.').split('-')[0]);
+    return Math.max(WHEEL_SEC_STEP,Math.round((isFinite(first)?first:5)*60));
+  };
+  const fix=list=>(list||[]).forEach(e=>{
+    if(!e) return;
+    if(e.durationSecs==null&&(e.durationMin!=null||e.type==='time')){
+      e.durationSecs=toSecs(e.durationMin); touched++;
+    }
+    if(e.muscle!=null){
+      const k=muscleKey(e.muscle);
+      if(k!==e.muscle){ e.muscle=k; touched++; }
+    }
+  });
+  (st.plans||[]).forEach(p=>fix(p.exercises));
+  fix(st.globalExercises);
+  (st.history||[]).forEach(h=>fix(h.exercises));
+  Object.keys(st.progress||{}).forEach(k=>{
+    const ov=(st.progress[k]||{}).overrides||{};
+    Object.keys(ov).forEach(exId=>{
+      const o=ov[exId];
+      if(o&&o.durationSecs==null&&o.durationMin!=null){ o.durationSecs=toSecs(o.durationMin); touched++; }
+    });
+  });
+  st.schema=4;
+  return touched>0;
+}
+
 // ══════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════
@@ -1168,7 +1209,7 @@ function defaultState(){
   // No preset plan: a new install starts empty and the user builds their own.
   // Shipping a sample plan meant every stranger found someone else's
   // exercises, weights and machine settings waiting for them.
-  return { schema:3, globalPauseSecs:75, lang:'en', activePlanId:null,
+  return { schema:4, globalPauseSecs:75, lang:'en', activePlanId:null,
     plans:[], globalExercises:[], progress:{}, history:[] };
 }
 
@@ -1180,8 +1221,8 @@ function saveState(){ localStorage.setItem('tp4_state', JSON.stringify(state)); 
 
 let state = loadState();
 // Both run: migrateMuscles leaves schema at 2, migrateDurations takes it to 3.
-const _m1=migrateMuscles(state), _m2=migrateDurations(state);
-if(_m1||_m2) saveState();
+const _m1=migrateMuscles(state), _m2=migrateDurations(state), _m3=migrateStale(state);
+if(_m1||_m2||_m3) saveState();
 let lang = state.lang || 'en';
 
 // Locales whose date/time formats the desktop importer can still parse when an
@@ -2438,7 +2479,7 @@ function openEditGex(id){
 
 function saveGex(){
   const name=document.getElementById('gex-name').value.trim(); if(!name){alert(t('alert.no-name'));return;}
-  const data={icon:selIconGex,muscle:document.getElementById('gex-muscle').value||'Allgemein',name,type:gexType,
+  const data={icon:selIconGex,muscle:document.getElementById('gex-muscle').value||'general',name,type:gexType,
     reps:document.getElementById('gex-reps').value.trim(),sets:parseInt(document.getElementById('gex-sets').value)||3,
     sithoehe:document.getElementById('gex-sitz').value.trim(),kg:document.getElementById('gex-kg').value.trim(),
     pauseSecs:durFieldValue('gex-pause'),
@@ -2544,7 +2585,7 @@ function savePlanEx(){
   const isTime=document.getElementById('mce-tt-time').classList.contains('active');
   const data={
     gexId:pendingGexId||null, icon:selIconPlanEx,
-    muscle:document.getElementById('mce-muscle').value||'Allgemein',
+    muscle:document.getElementById('mce-muscle').value||'general',
     name:document.getElementById('mce-name').value.trim()||t('field.name'),
     type:isTime?'time':'reps',
     reps:document.getElementById('mce-reps')?document.getElementById('mce-reps').value.trim():'',
@@ -2662,6 +2703,7 @@ function applyImport(imported){
   Object.assign(state,imported);
   migrateMuscles(state);
   migrateDurations(state);
+  migrateStale(state);
   lang=state.lang||'en';
   return true;
 }
