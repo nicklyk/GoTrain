@@ -691,6 +691,27 @@ def test_the_library_can_be_filtered():
     report(drive(empty, body2), "filter empty")
 
 
+def test_the_set_heading_matches_the_exercise():
+    print("\nset heading (browser)")
+    if not browser():
+        skip("set heading", "no chromium found")
+        return
+    body = """
+      const h=()=>d.getElementById('lbl-sets-timer').textContent;
+      w.startWithPlan('p1');
+      w.openDetail('x1');
+      ok('a reps exercise is headed Sets', h(), 'Sets');
+      w.openDetail('x2');
+      ok('a timed exercise is headed Timer', h(), 'TIMER');
+      w.openDetail('x1');
+      ok('and back again', h(), 'Sets');
+      // Switching language with the screen open must not reset it to Timer.
+      w.changeLang('de');
+      ok('a language change keeps it right', h(), 'Sätze');
+    """
+    report(drive(DEMO, body), "set heading")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -802,7 +823,7 @@ def main():
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
               test_adjusting_keeps_a_hand_completed_exercise_done,
               test_last_time_is_shown, test_a_personal_best_is_marked,
-              test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_user_text_cannot_inject_markup,
+              test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")

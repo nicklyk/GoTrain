@@ -466,7 +466,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
   <div class="info-grid" id="d-info"></div>
   <div class="note-box" id="d-note" style="display:none"></div>
   <div class="last-time" id="d-last" style="display:none"></div>
-  <div class="sec-label" id="lbl-sets-timer">SÄTZE / TIMER</div>
+  <div class="sec-label" id="lbl-sets-timer"></div>
   <div id="d-sets"></div>
   <div id="next-ex-slot"></div>
   <button class="btn-outline" id="d-adjust-btn" onclick="openAdjust()"></button>
@@ -1280,7 +1280,7 @@ function applyTranslations(){
   document.getElementById('d-done-btn').textContent = t('complete');
   document.getElementById('d-undo-btn').textContent = t('undo');
   document.getElementById('d-adjust-btn').textContent = t('btn.adjust');
-  document.getElementById('lbl-sets-timer').textContent = t('timer');
+  renderSetsLabel();
   document.getElementById('tov-lbl').textContent = t('timer.lbl');
   document.getElementById('tov-skip').textContent = t('skip');
   document.getElementById('btn-new-plan').textContent = t('btn.new-plan');
@@ -1716,6 +1716,7 @@ function openDetail(exId){
     grid.innerHTML=h;
   }
   renderLastTime(ex);
+  renderSetsLabel();
   const noteEl=document.getElementById('d-note');
   const notes=[];
   if(isAdjusted(exId)) notes.push('✏️  '+t('adjust.active'));
@@ -1859,6 +1860,17 @@ function isPersonalBest(ex){
     if(isFinite(v)&&v>0){ seen=true; best=Math.max(best,v); }
   }));
   return seen&&now>best;
+}
+
+// The heading above the set rows. It was set once, when translations were
+// applied, to "Timer" -- so a reps exercise showed TIMER above its sets.
+// It follows the exercise on screen now, and is re-run on a language change
+// in case the detail screen is open at the time.
+function renderSetsLabel(){
+  const el=document.getElementById('lbl-sets-timer'); if(!el) return;
+  let ex=null;
+  try{ ex=currentExId?getEx(currentExId):null; }catch(e){}
+  el.textContent = ex&&ex.type!=='time' ? t('field.sets') : t('timer');
 }
 
 function renderLastTime(ex){
