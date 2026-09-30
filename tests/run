@@ -384,7 +384,10 @@ def test_user_text_cannot_inject_markup():
       w.showScreen('history'); w.openHistoryDetail('h1');
       w.openPlanDetail('p1'); w.showPlanTab('exercises'); w.showPlanTab('phases');
 
-      ok('no injected handler ran', String(w.__pwned), 'undefined');
+      // Not asserting on a global the handler would set: an onerror fires
+      // asynchronously, after these synchronous checks, so that assertion
+      // passes even when the injection worked. The element never existing is
+      // the property that is actually checkable here.
       ok('no img element was created', d.querySelectorAll('img').length, 0);
       ok('no script landed in the rendered content', d.querySelectorAll('#app-scroll script').length, 0);
 
