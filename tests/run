@@ -490,6 +490,43 @@ def test_deleting_an_exercise_clears_its_progress():
     report(drive(done, body), "delete")
 
 
+def test_adjusting_keeps_a_hand_completed_exercise_done():
+    print("\nadjust keeps done (browser)")
+    if not browser():
+        skip("adjust keeps done", "no chromium found")
+        return
+    body = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      w.markExDone();
+      ok('marked done with no sets ticked', w.isDone('x1'), true);
+
+      // Change only the weight. This used to withdraw "done" silently,
+      // because completed sets were still below the planned count.
+      w.openAdjust();
+      d.getElementById('adj-kg').value='50';
+      w.saveAdjust();
+      ok('still done after changing the weight', w.isDone('x1'), true);
+      ok('the adjustment was recorded', w.getEx('x1').kg, '50');
+
+      // Raising the set count does add work that is not ticked off, so
+      // withdrawing it there is right.
+      w.openDetail('x1'); w.openAdjust();
+      d.getElementById('adj-sets').value='5';
+      w.saveAdjust();
+      ok('adding sets does withdraw it', w.isDone('x1'), false);
+
+      // And a normally finished exercise is unaffected by a weight change.
+      w.openDetail('x2');
+      w.openDetail('x1');
+      w.completeSet('x1',1); w.completeSet('x1',2); w.completeSet('x1',3);
+      w.completeSet('x1',4); w.completeSet('x1',5);
+      ok('finishing every set marks it done', w.isDone('x1'), true);
+      w.openAdjust(); d.getElementById('adj-kg').value='55'; w.saveAdjust();
+      ok('and a weight change leaves it done', w.isDone('x1'), true);
+    """
+    report(drive(DEMO, body), "adjust")
+
+
 def test_import_of_an_old_export():
     print("\nimport of an old export (browser)")
     if not browser():
@@ -598,7 +635,8 @@ def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
-              test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress, test_user_text_cannot_inject_markup,
+              test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
+              test_adjusting_keeps_a_hand_completed_exercise_done, test_user_text_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")

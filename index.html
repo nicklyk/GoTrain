@@ -1788,30 +1788,40 @@ function saveAdjust(){
   });
 
   const prog=getProg(state.activePlanId);
+  // Read the set count before the override lands, so clampSets can tell an
+  // adjustment that added sets from one that only changed the weight.
+  const before=setCountOf(exId);
   if(Object.keys(patch).length) prog.overrides[exId]=patch;
   else delete prog.overrides[exId];
 
-  clampSets(exId);
+  clampSets(exId,before);
   saveState(); updateProgress();
   closeModal('modalAdjust');
   openDetail(exId);
 }
 
 function resetAdjust(){
+  const before=setCountOf(currentExId);
   delete getProg(state.activePlanId).overrides[currentExId];
-  clampSets(currentExId);
+  clampSets(currentExId,before);
   saveState(); updateProgress();
   closeModal('modalAdjust');
   openDetail(currentExId);
 }
 
+function setCountOf(exId){ const ex=getEx(exId); return ex?parseInt(ex.sets,10)||0:0; }
+
 // Lowering the set count below what is already ticked off would leave the
 // exercise reporting more completed sets than it has.
-function clampSets(exId){
+function clampSets(exId,prevMax){
   const ex=getEx(exId); if(!ex||ex.type==='time') return;
   const max=parseInt(ex.sets,10)||0;
   if(getSets(exId)>max){ setSets(exId,max); }
-  if(max>0&&getSets(exId)<max) unsetDone(exId);
+  // Only withdraw "done" when this adjustment actually added sets that are
+  // not ticked off yet. Finishing an exercise with the button without ticking
+  // every set is a deliberate choice, and changing today's weight afterwards
+  // used to undo it silently.
+  if(max>0&&getSets(exId)<max&&max>(prevMax==null?0:prevMax)) unsetDone(exId);
 }
 
 function renderSetRows(ex){
