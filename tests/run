@@ -423,6 +423,69 @@ def test_user_text_cannot_inject_markup():
     report(drive(evil, body), "escaping")
 
 
+def test_imported_fields_cannot_inject_markup():
+    print("\nmarkup in imported fields (browser)")
+    if not browser():
+        skip("field escaping", "no chromium found")
+        return
+    # The fields the first pass missed: phase names, the numbers-that-are-
+    # really-strings (kg, reps, seat, sets, history counters) and history's
+    # pre-`ts` date/time fallback. All arrive verbatim from an imported file.
+    # Each payload names its field, so a leak reports which one.
+    def tag(f):
+        return f'<img src=x data-f={f}>'
+    evil = json.loads(json.dumps(DEMO))
+    plan = evil["plans"][0]
+    plan["phases"] = [{"id": "ph", "name": tag("phase"), "colorIdx": 0},
+                      {"id": "ph2", "name": tag("nextphase"), "colorIdx": 1}]
+    x1 = plan["exercises"][0]
+    x1.update(kg=tag("kg"), reps=tag("reps"), sithoehe=tag("seat"))
+    plan["exercises"][1]["phaseId"] = "ph2"
+    plan["exercises"].append(dict(x1, id="x3", phaseId="ph2", name="Squat",
+                                  kg="", reps="5", sithoehe="", sets=tag("sets")))
+    evil["globalExercises"] = [dict(x1, id="g1", name="Lib")]
+    evil["history"] = [{"id": "h1", "date": tag("date"), "time": tag("time"),
+                        "plan": tag("plan"), "planId": "p1",
+                        "totalExercises": 1, "doneExercises": tag("done"),
+                        "totalSets": tag("totalsets"),
+                        "exercises": [
+                            {"name": "Bench", "muscle": "chest", "type": "reps", "sets": 3,
+                             "setsCompleted": 3, "done": True,
+                             "reps": tag("hreps"), "kg": tag("hkg")}]}]
+    body = """
+      // Checked after every surface: a later render replaces an earlier one's
+      // innerHTML, so a single count at the end would miss most leaks.
+      const leaked=()=>Array.from(d.querySelectorAll('img')).map(i=>i.dataset.f).join(',');
+
+      w.startWithPlan('p1');
+      ok('workout list: no field became an element', leaked(), '');
+      w.openDetail('x1'); w.showNextExerciseBanner('x2');
+      ok('exercise detail and next banner: no field became an element', leaked(), '');
+      w.openDetail('x3');
+      ok('detail of an exercise with odd sets: no element', leaked(), '');
+      w.openDetail('x1'); w.openAdjust();
+      ok('adjust-for-today: no field became an element', leaked(), '');
+      w.closeModal('modalAdjust');
+
+      w.openPlanDetail('p1'); w.showPlanTab('exercises');
+      ok('plan editor list: no field became an element', leaked(), '');
+      w.openEditPlanEx('x3');
+      ok('plan exercise editor: no field became an element', leaked(), '');
+      ok('the editor keeps the sets value as typed',
+         d.getElementById('mce-sets').getAttribute('value'), '<img src=x data-f=sets>');
+      w.openAddExToPlan();
+      ok('add-from-library: no field became an element', leaked(), '');
+
+      w.showScreen('history');
+      ok('history list: no field became an element', leaked(), '');
+      w.openHistoryDetail('h1');
+      ok('history detail: no field became an element', leaked(), '');
+      ok('history detail shows the plan name literally',
+         d.querySelector('#hd-info').textContent.indexOf('<img src=x data-f=plan>') >= 0, true);
+    """
+    report(drive(evil, body), "field escaping")
+
+
 def test_stranded_data_is_repaired():
     print("\nrepair of stranded data (browser)")
     if not browser():
@@ -823,7 +886,7 @@ def main():
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
               test_adjusting_keeps_a_hand_completed_exercise_done,
               test_last_time_is_shown, test_a_personal_best_is_marked,
-              test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup,
+              test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")

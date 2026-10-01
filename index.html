@@ -1606,7 +1606,7 @@ function renderWorkoutActive(){
   </div>`;
   plan.phases.forEach((phase,pi)=>{
     const exs=plan.exercises.filter(e=>e.phaseId===phase.id); if(!exs.length) return;
-    h+=`<div class="phase-card pc-${pi%PHASE_COLORS}"><div class="phase-label pt-${pi%PHASE_COLORS}">${t('phase')} ${pi+1}</div><div class="phase-title">${phase.name}</div></div>`;
+    h+=`<div class="phase-card pc-${pi%PHASE_COLORS}"><div class="phase-label pt-${pi%PHASE_COLORS}">${t('phase')} ${pi+1}</div><div class="phase-title">${escHtml(phase.name)}</div></div>`;
     exs.forEach(ex=>{ h+=exItemHTML(ex); });
   });
   const unphased=plan.exercises.filter(e=>!e.phaseId||!plan.phases.find(ph=>ph.id===e.phaseId));
@@ -1678,7 +1678,7 @@ function exItemHTML(planExercise){
   if(ex.type==='reps') for(let i=0;i<ex.sets;i++) dots+=`<div class="dot ${i<ds?'done':''}"></div>`;
   return `<div class="exercise-item ${done?'done':''}" onclick="openDetail('${ex.id}')">
     <div class="ex-icon">${escHtml(ex.icon)}</div>
-    <div class="ex-info"><div class="ex-muscle">${escHtml(muscleLabel(ex.muscle))}</div><div class="ex-name">${escHtml(ex.name)}</div><div class="ex-meta">${metaStr(ex)}</div>${ex.type==='reps'?`<div class="ex-dots">${dots}</div>`:''}</div>
+    <div class="ex-info"><div class="ex-muscle">${escHtml(muscleLabel(ex.muscle))}</div><div class="ex-name">${escHtml(ex.name)}</div><div class="ex-meta">${escHtml(metaStr(ex))}</div>${ex.type==='reps'?`<div class="ex-dots">${dots}</div>`:''}</div>
     <div class="ex-arrow">${done?'✓':'›'}</div>
   </div>`;
 }
@@ -1709,7 +1709,7 @@ function openDetail(exId){
     grid.innerHTML=`<div class="info-box" style="grid-column:1/-1"><div class="ib-label">${t('field.duration')}</div><div class="ib-val">${fmtDur(exDurSecs(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
   } else {
     let h=`<div class="info-box"><div class="ib-label">${t('field.reps')}</div><div class="ib-val">${escHtml(ex.reps||'–')}</div><div class="ib-sub">${t('reps.abbr')}</div></div>
-      <div class="info-box"><div class="ib-label">${t('field.sets')}</div><div class="ib-val">${ex.sets}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>`;
+      <div class="info-box"><div class="ib-label">${t('field.sets')}</div><div class="ib-val">${escHtml(ex.sets)}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>`;
     if(ex.sithoehe) h+=`<div class="info-box"><div class="ib-label">${t('field.seatheight')}</div><div class="ib-val">${escHtml(ex.sithoehe)}</div><div class="ib-sub">${t('seatheight.abbr')}</div></div>`;
     if(ex.kg) h+=`<div class="info-box"><div class="ib-label">${t('field.weight')}</div><div class="ib-val">${escHtml(ex.kg)}</div><div class="ib-sub">kg</div></div>`;
     h+=`<div class="info-box"><div class="ib-label">${t('gs.pause.lbl')}</div><div class="ib-val">${fmtDur(pauseFor(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
@@ -1779,7 +1779,7 @@ function openAdjust(){
              value="${escAttr(ex[f.key]===undefined?'':ex[f.key])}">`;
     return `<div class="s-row">
       <div class="s-lbl">${t(f.label)}
-        <div class="g-sub">${t('adjust.plan')} ${planVal}</div>
+        <div class="g-sub">${t('adjust.plan')} ${escHtml(planVal)}</div>
       </div>
       ${control}
     </div>`;
@@ -2005,7 +2005,7 @@ function completeSet(exId,setNum){
   }
   updateProgress();
   if(setNum<ex.sets){
-    document.getElementById('tovNext').innerHTML=`${t('set')} <strong>${setNum+1}/${ex.sets}</strong>`;
+    document.getElementById('tovNext').innerHTML=`${t('set')} <strong>${setNum+1}/${escHtml(ex.sets)}</strong>`;
     startPauseTimer(pauseFor(ex));
   } else {
     // Last set done – auto-mark exercise as done
@@ -2057,7 +2057,7 @@ function showNextExerciseBanner(nextExId){
   const nextPhase = plan.phases.find(ph=>ph.id===nextEx.phaseId);
   const isDifferentPhase = nextPhase && (!currentPhase || currentPhase.id !== nextPhase.id);
   const phaseLabel = isDifferentPhase
-    ? `<div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px">📍 ${nextPhase.name}</div>`
+    ? `<div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px">📍 ${escHtml(nextPhase.name)}</div>`
     : '';
 
   slot.innerHTML = `<div style="background:rgba(200,241,53,.1);border:1.5px solid var(--accent);border-radius:var(--radius);padding:16px;margin-top:12px;display:flex;align-items:center;gap:14px;cursor:pointer" onclick="openDetail('${nextExId}')">
@@ -2429,7 +2429,7 @@ function renderPlanExercises(){
   const plan=getPlanById(editingPlanId), cont=document.getElementById('ptab-exercises'); let h='';
   plan.exercises.forEach(ex=>{
     const phase=plan.phases.find(ph=>ph.id===ex.phaseId);
-    const phaseOpts=plan.phases.map(ph=>`<option value="${ph.id}" ${ex.phaseId===ph.id?'selected':''}>${ph.name}</option>`).join('')+`<option value="" ${!ex.phaseId?'selected':''}>${t('no-phase')}</option>`;
+    const phaseOpts=plan.phases.map(ph=>`<option value="${ph.id}" ${ex.phaseId===ph.id?'selected':''}>${escHtml(ph.name)}</option>`).join('')+`<option value="" ${!ex.phaseId?'selected':''}>${t('no-phase')}</option>`;
     h+=`<div class="plan-ex-row" id="per-${ex.id}">
       <div class="drag-handle" id="dh-${ex.id}">⠿</div>
       <div class="plan-ex-info">
@@ -2651,7 +2651,7 @@ function openAddExToPlan(){
       <div class="gex-item" style="margin-bottom:6px;cursor:pointer" onclick="pickGex('${gex.id}')">
         <div class="gex-header" style="pointer-events:none">
           <div class="gex-title"><span>${escHtml(gex.icon)}</span><span>${escHtml(gex.name)}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${escHtml(muscleLabel(gex.muscle))}</span></div>
-          <div style="font-size:11px;color:var(--muted)">${metaStr(gex)}</div>
+          <div style="font-size:11px;color:var(--muted)">${escHtml(metaStr(gex))}</div>
         </div>
       </div>`).join('');
   }
@@ -2684,7 +2684,7 @@ function openCustomizeExModal(data,btnLabel,isNew){
   selIconPlanEx=data.icon||ICONS[0];
   buildIconPicker('iconPickerPlanEx',selIconPlanEx,'selectIconPlanEx');
   const plan=getPlanById(editingPlanId);
-  const phaseOpts=plan.phases.map(ph=>`<option value="${ph.id}" ${data.phaseId===ph.id?'selected':''}>${ph.name}</option>`).join('')+`<option value="" ${!data.phaseId?'selected':''}>${t('no-phase')}</option>`;
+  const phaseOpts=plan.phases.map(ph=>`<option value="${ph.id}" ${data.phaseId===ph.id?'selected':''}>${escHtml(ph.name)}</option>`).join('')+`<option value="" ${!data.phaseId?'selected':''}>${t('no-phase')}</option>`;
   const curType=data.type||'reps';
   document.getElementById('mce-fields').innerHTML=`
     <div class="s-row"><div class="s-lbl">${t('field.type')}</div>
@@ -2700,7 +2700,7 @@ function openCustomizeExModal(data,btnLabel,isNew){
     <div id="mce-reps-fields" style="${curType==='time'?'display:none':''}">
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl">${t('field.reps')}</div><input class="s-inp" id="mce-reps" value="${escAttr(data.reps||'')}"></div>
-        <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" min="1" value="${data.sets||3}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" min="1" value="${escAttr(data.sets||3)}"></div>
       </div>
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl">${t('field.seatheight')}</div><input class="s-inp" id="mce-sitz" value="${escAttr(data.sithoehe||'')}"></div>
@@ -3072,9 +3072,9 @@ function renderHistory(){
     const pct=entry.totalExercises?Math.round(entry.doneExercises/entry.totalExercises*100):0;
     h+=`<div class="h-card" onclick="openHistoryDetail('${entry.id}')">
       <div class="h-title">${escHtml(entry.plan)} · ${escHtml(entryDate(entry))} <span class="h-card-arrow">›</span></div>
-      <div class="h-row"><span>${t('history.time')}</span><span class="h-val">${entryTime(entry)}</span></div>
-      <div class="h-row"><span>${t('history.detail.exercises')}</span><span class="h-val">${entry.doneExercises||0}/${entry.totalExercises||0}</span></div>
-      <div class="h-row"><span>${t('history.sets')}</span><span class="h-val">${entry.totalSets||0}</span></div>
+      <div class="h-row"><span>${t('history.time')}</span><span class="h-val">${escHtml(entryTime(entry))}</span></div>
+      <div class="h-row"><span>${t('history.detail.exercises')}</span><span class="h-val">${escHtml(entry.doneExercises||0)}/${escHtml(entry.totalExercises||0)}</span></div>
+      <div class="h-row"><span>${t('history.sets')}</span><span class="h-val">${escHtml(entry.totalSets||0)}</span></div>
     </div>`;
   });
   cont.innerHTML=h;
@@ -3087,10 +3087,10 @@ function openHistoryDetail(entryId){
   // Info boxes
   const pct=entry.totalExercises?Math.round((entry.doneExercises||0)/entry.totalExercises*100):0;
   document.getElementById('hd-info').innerHTML=`
-    <div class="info-box"><div class="ib-label">${t('history.detail.exercises')}</div><div class="ib-val">${entry.doneExercises||0}/${entry.totalExercises||0}</div><div class="ib-sub">${pct}%</div></div>
-    <div class="info-box"><div class="ib-label">${t('history.sets')}</div><div class="ib-val">${entry.totalSets||0}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>
-    <div class="info-box"><div class="ib-label">${t('history.time')}</div><div class="ib-val">${entryTime(entry)}</div><div class="ib-sub">${entryDate(entry)}</div></div>
-    <div class="info-box"><div class="ib-label">${t('history.detail.plan')}</div><div class="ib-val" style="font-size:14px;margin-top:4px">${entry.plan}</div><div class="ib-sub">&nbsp;</div></div>`;
+    <div class="info-box"><div class="ib-label">${t('history.detail.exercises')}</div><div class="ib-val">${escHtml(entry.doneExercises||0)}/${escHtml(entry.totalExercises||0)}</div><div class="ib-sub">${pct}%</div></div>
+    <div class="info-box"><div class="ib-label">${t('history.sets')}</div><div class="ib-val">${escHtml(entry.totalSets||0)}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>
+    <div class="info-box"><div class="ib-label">${t('history.time')}</div><div class="ib-val">${escHtml(entryTime(entry))}</div><div class="ib-sub">${escHtml(entryDate(entry))}</div></div>
+    <div class="info-box"><div class="ib-label">${t('history.detail.plan')}</div><div class="ib-val" style="font-size:14px;margin-top:4px">${escHtml(entry.plan)}</div><div class="ib-sub">&nbsp;</div></div>`;
   // Exercise list
   const exList=entry.exercises||[];
   document.getElementById('hd-exercises').innerHTML=exList.map(ex=>{
@@ -3098,7 +3098,7 @@ function openHistoryDetail(entryId){
     const meta=ex.type==='time'?(ex.durationSecs!=null?fmtDur(ex.durationSecs)+' '+t('unit.min'):(ex.durationMin||'?')+' '+t('unit.min')):(ex.setsCompleted||0)+'/'+ex.sets+' '+t('field.sets').toLowerCase()+(ex.reps?' · '+ex.reps+' '+t('reps.abbr'):'')+(ex.kg?' · '+ex.kg+'kg':'');
     return `<div class="hd-ex-row">
       <div class="hd-ex-icon">${escHtml(ex.icon)}</div>
-      <div class="hd-ex-info"><div class="hd-ex-name">${escHtml(ex.name)}</div><div class="hd-ex-meta">${escHtml(muscleLabel(ex.muscle))} · ${meta}</div></div>
+      <div class="hd-ex-info"><div class="hd-ex-name">${escHtml(ex.name)}</div><div class="hd-ex-meta">${escHtml(muscleLabel(ex.muscle))} · ${escHtml(meta)}</div></div>
       <div class="hd-ex-status">${statusIcon}</div>
     </div>`;
   }).join('');
