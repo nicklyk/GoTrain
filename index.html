@@ -2839,6 +2839,31 @@ function triggerImport(){ document.getElementById('import-file').click(); }
 // touched rather than repaired -- guessing at what a damaged file meant is not
 // something to do to the only copy. Only fields the file carries are checked:
 // Object.assign keeps the app's own value for any it leaves out.
+const SAFE_ID=/^[A-Za-z0-9_-]{1,64}$/;
+function idsLookSafe(imp){
+  const ok=v=>typeof v==='string'&&SAFE_ID.test(v);
+  const okOrEmpty=v=>v==null||v===''||ok(v);
+  if(!okOrEmpty(imp.activePlanId)) return false;
+  for(const p of imp.plans||[]){
+    if(!ok(p.id)) return false;
+    if(!(p.phases||[]).every(ph=>ok(ph.id))) return false;
+    if(!(p.exercises||[]).every(e=>ok(e.id)&&okOrEmpty(e.phaseId))) return false;
+  }
+  if(!(imp.globalExercises||[]).every(g=>ok(g.id))) return false;
+  for(const h of imp.history||[]){
+    if(!okOrEmpty(h.id)||!okOrEmpty(h.planId)) return false;
+    if(!(h.exercises||[]).every(e=>e==null||okOrEmpty(e.id))) return false;
+  }
+  for(const [k,v] of Object.entries(imp.progress||{})){
+    if(!ok(k)) return false;
+    if(v==null) continue;              // a null entry is harmless: getProg replaces it
+    if(!Object.keys(v.completedSets||{}).every(ok)) return false;
+    if(!(v.doneExercises||[]).every(ok)) return false;
+    if(!Object.keys(v.overrides||{}).every(ok)) return false;
+  }
+  return true;
+}
+
 function importLooksSound(imp){
   const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
   const listOf=v=>Array.isArray(v)&&v.every(isObj);
@@ -2857,6 +2882,13 @@ function importLooksSound(imp){
     if(!Object.values(imp.progress).every(p=>p===null||
        (isObj(p)&&isObj(p.completedSets)&&Array.isArray(p.doneExercises)))) return false;
   }
+  // Ids end up raw in value="" attributes and inside onclick handlers, on
+  // the assumption that the app made them -- uid() only ever produces base-36
+  // characters. A file can carry anything, so one id holding a quote could
+  // close an attribute and inject an element, or break out of an onclick
+  // string and run on the next tap. Checking every id here, once, closes
+  // all of those sites together instead of escaping each template.
+  if(!idsLookSafe(imp)) return false;
   return true;
 }
 function applyImport(imported){

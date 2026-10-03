@@ -879,6 +879,61 @@ def test_import_asks_before_shrinking_history():
     report(drive(have, body), "import confirmation")
 
 
+def test_an_import_with_unsafe_ids_is_refused():
+    print("\nimport with unsafe ids (browser)")
+    if not browser():
+        skip("unsafe ids", "no chromium found")
+        return
+    # Ids are interpolated raw into value="" attributes and into onclick
+    # handlers, on the assumption that the app made them. On an import they
+    # come from the file. This one closes a value="" early and injects an
+    # element; one in an onclick would run on the next tap.
+    evil = 'ph"><img src=x id=pwned>'
+    def with_id(where):
+        st = json.loads(json.dumps(DEMO))
+        where(st)
+        return st
+    cases = {
+        "a phase id":      with_id(lambda s: (s["plans"][0]["phases"][0].update(id=evil),
+                                              s["plans"][0]["exercises"][0].update(phaseId=evil))),
+        "a plan id":       with_id(lambda s: (s["plans"][0].update(id="p');alert(1);//"),
+                                              s.update(activePlanId="p');alert(1);//"))),
+        "an exercise id":  with_id(lambda s: s["plans"][0]["exercises"][0].update(id="x1')//")),
+        "a library id":    with_id(lambda s: s.update(globalExercises=[{"id": 'g"x', "name": "G",
+                                   "type": "reps", "muscle": "chest"}])),
+        "a session id":    with_id(lambda s: s.update(history=[dict(
+                                   _session("h1", "2026-09-20T10:00:00Z", "70"), id="h<b>")])),
+        "a progress key":  with_id(lambda s: s.update(progress={'p1"': {"completedSets": {},
+                                   "doneExercises": [], "overrides": {}}})),
+        "a done-list id":  with_id(lambda s: s.update(progress={"p1": {"completedSets": {},
+                                   "doneExercises": ["x1'"], "overrides": {}}})),
+        "a non-string id": with_id(lambda s: s["plans"][0].update(id={"x": 1})),
+    }
+    for label, payload in cases.items():
+        body = """
+          const before=localStorage.getItem('tp4_state');
+          let threw=false;
+          try{ w.applyImport(%s); }catch(e){ threw=true; }
+          ok('%s is refused', threw, true);
+          ok('%s leaves the stored state alone', localStorage.getItem('tp4_state')===before, true);
+          w.openPlanDetail(w.eval('state').activePlanId||'p1'); w.showPlanTab('exercises');
+          ok('%s injects nothing', d.querySelectorAll('img#pwned').length, 0);
+        """ % (json.dumps(payload).replace("</", "<\\/"), label, label, label)
+        report(drive(DEMO, body), label)
+
+    # What the app and the plugin really write still goes through: uid()
+    # gives seven base-36 characters, and nulls stand for "no phase".
+    real = json.loads(json.dumps(DEMO))
+    real["plans"][0]["exercises"][0]["phaseId"] = None
+    real["history"] = [_session("0lgqxuz", "2026-09-20T10:00:00Z", "70")]
+    body = """
+      let threw=false;
+      try{ w.applyImport(%s); }catch(e){ threw=true; }
+      ok('ordinary ids and a null phaseId are accepted', threw, false);
+    """ % json.dumps(real)
+    report(drive(DEMO, body), "ordinary ids")
+
+
 def test_a_misshapen_import_is_refused():
     print("\nimport of a misshapen file (browser)")
     if not browser():
@@ -946,7 +1001,7 @@ def main():
               test_last_time_is_shown, test_a_personal_best_is_marked,
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history,
-              test_a_misshapen_import_is_refused):
+              test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
