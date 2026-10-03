@@ -2832,8 +2832,31 @@ function exportFilename(){ return 'gotrain-'+new Date().toISOString().slice(0,10
 function triggerImport(){ document.getElementById('import-file').click(); }
 // Split from importData so the merge can be exercised without a file picker.
 // Returns false when the user declines, leaving state untouched.
+// The renderers trust the shape of state, so a file that is valid JSON but the
+// wrong shape used to be saved and then crash the next start: an empty workout
+// screen, a Settings tab that throws, and no way out but "Delete all data",
+// which takes the surviving history with it. Refused before anything is
+// touched rather than repaired -- guessing at what a damaged file meant is not
+// something to do to the only copy. Only fields the file carries are checked:
+// Object.assign keeps the app's own value for any it leaves out.
+function importLooksSound(imp){
+  const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+  const listOf=v=>Array.isArray(v)&&v.every(isObj);
+  if(!isObj(imp)||!('activePlanId' in imp)) return false;
+  if(!listOf(imp.plans)) return false;
+  if(!imp.plans.every(p=>listOf(p.phases)&&listOf(p.exercises))) return false;
+  if('history' in imp&&!listOf(imp.history)) return false;
+  if('globalExercises' in imp&&!listOf(imp.globalExercises)) return false;
+  if('progress' in imp){
+    if(!isObj(imp.progress)) return false;
+    // A null entry is harmless: getProg replaces it with an empty one.
+    if(!Object.values(imp.progress).every(p=>p===null||
+       (isObj(p)&&isObj(p.completedSets)&&Array.isArray(p.doneExercises)))) return false;
+  }
+  return true;
+}
 function applyImport(imported){
-  if(!imported||!Array.isArray(imported.plans)||!('activePlanId' in imported)) throw new Error('invalid');
+  if(!importLooksSound(imported)) throw new Error('invalid');
   // Object.assign below replaces history wholesale, and tp4_state is the only
   // copy. Importing an older backup would silently drop every workout logged
   // since it was taken, so name the counts and let the user back out. A file

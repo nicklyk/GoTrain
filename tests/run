@@ -879,6 +879,62 @@ def test_import_asks_before_shrinking_history():
     report(drive(have, body), "import confirmation")
 
 
+def test_a_misshapen_import_is_refused():
+    print("\nimport of a misshapen file (browser)")
+    if not browser():
+        skip("misshapen import", "no chromium found")
+        return
+    # Each of these was valid JSON that used to be accepted, saved, and then
+    # crash the next start or a tab. tp4_state is the only copy, so a refusal
+    # must leave both the live state and the stored one exactly as they were.
+    def bent(change):
+        s = json.loads(json.dumps(DEMO))
+        change(s)
+        return s
+    bad = {
+        "a plan with no phases or exercises": {"activePlanId": "a", "plans": [{"id": "a", "name": "X"}]},
+        "a plan whose phases are null": bent(lambda s: s["plans"][0].update(phases=None)),
+        "a plan whose exercises are not a list": bent(lambda s: s["plans"][0].update(exercises={})),
+        "a null plan": bent(lambda s: s["plans"].append(None)),
+        "a null exercise": bent(lambda s: s["plans"][0]["exercises"].append(None)),
+        "a null phase": bent(lambda s: s["plans"][0]["phases"].append(None)),
+        "history that is null": bent(lambda s: s.update(history=None)),
+        "history that is an object": bent(lambda s: s.update(history={})),
+        "a null history entry": bent(lambda s: s.update(history=[None])),
+        "a library that is null": bent(lambda s: s.update(globalExercises=None)),
+        "a null library exercise": bent(lambda s: s.update(globalExercises=[None])),
+        "progress that is null": bent(lambda s: s.update(progress=None)),
+        "progress without its lists": bent(lambda s: s.update(progress={"p1": {}})),
+        "a list instead of an object": [DEMO],
+    }
+    good = bent(lambda s: s.update(history=[_session("h9", "2026-09-20T10:00:00Z", "70")],
+                                   progress={"p1": None}))
+    body = """
+      const bad=%s, good=%s;
+      w.confirm=()=>true;
+      const before=JSON.stringify(w.eval('state')), saved=localStorage.getItem('tp4_state');
+      for(const [name,file] of Object.entries(bad)){
+        let err=''; try{ w.applyImport(file); }catch(e){ err=e.message; }
+        ok(name+' is refused', err, 'invalid');
+        ok(name+' leaves the state alone', JSON.stringify(w.eval('state'))===before, true);
+        ok(name+' saves nothing', localStorage.getItem('tp4_state')===saved, true);
+      }
+      // The same through the file picker: an error, and no save or reload.
+      let alerted=0; w.alert=()=>{ alerted++; };
+      w.FileReader=function(){ this.readAsText=s=>this.onload({target:{result:s}}); };
+      w.importData({target:{files:[JSON.stringify(bad['a plan with no phases or exercises'])]}});
+      ok('a misshapen picked file reports an error', alerted, 1);
+      ok('a misshapen picked file saves nothing', localStorage.getItem('tp4_state')===saved, true);
+
+      ok('a sound file still imports', w.applyImport(good), true);
+      ok('and brings its history', w.eval('state').history[0].id, 'h9');
+      // Fields a file leaves out keep the app's own value, as before.
+      ok('a file without a library or progress still imports',
+         w.applyImport({activePlanId:'p1', plans:good.plans}), true);
+    """ % (json.dumps(bad), json.dumps(good))
+    report(drive(DEMO, body), "misshapen import")
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
@@ -887,7 +943,8 @@ def main():
               test_adjusting_keeps_a_hand_completed_exercise_done,
               test_last_time_is_shown, test_a_personal_best_is_marked,
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
-              test_import_of_an_old_export, test_import_asks_before_shrinking_history):
+              test_import_of_an_old_export, test_import_asks_before_shrinking_history,
+              test_a_misshapen_import_is_refused):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
