@@ -901,6 +901,8 @@ def test_a_misshapen_import_is_refused():
         "history that is null": bent(lambda s: s.update(history=None)),
         "history that is an object": bent(lambda s: s.update(history={})),
         "a null history entry": bent(lambda s: s.update(history=[None])),
+        "a history entry whose exercises are not a list":
+            bent(lambda s: s.update(history=[dict(_session("h1", "2026-09-20T10:00:00Z", "70"), exercises={})])),
         "a library that is null": bent(lambda s: s.update(globalExercises=None)),
         "a null library exercise": bent(lambda s: s.update(globalExercises=[None])),
         "progress that is null": bent(lambda s: s.update(progress=None)),

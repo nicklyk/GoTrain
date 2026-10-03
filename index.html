@@ -2846,6 +2846,10 @@ function importLooksSound(imp){
   if(!listOf(imp.plans)) return false;
   if(!imp.plans.every(p=>listOf(p.phases)&&listOf(p.exercises))) return false;
   if('history' in imp&&!listOf(imp.history)) return false;
+  // Every migration walks h.exercises with (list||[]).forEach, so null or a
+  // missing list is harmless but an object or a string throws -- after
+  // Object.assign on import, and before the first render on every start.
+  if(!(imp.history||[]).every(h=>h.exercises==null||Array.isArray(h.exercises))) return false;
   if('globalExercises' in imp&&!listOf(imp.globalExercises)) return false;
   if('progress' in imp){
     if(!isObj(imp.progress)) return false;
