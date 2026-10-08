@@ -992,6 +992,56 @@ def test_a_misshapen_import_is_refused():
     report(drive(DEMO, body), "misshapen import")
 
 
+def test_a_new_library_exercise_starts_from_defaults():
+    print("\nnew library exercise defaults (browser)")
+    if not browser():
+        skip("new exercise defaults", "no chromium found")
+        return
+    # The rest and duration fields are buttons that carry their value in
+    # data-secs, so clearing them with .value='' does nothing. A fresh page
+    # then saved pauseSecs NaN, which the plan editor turned into a 0 s rest,
+    # and after an edit the next new exercise silently inherited its values.
+    lib = json.loads(json.dumps(DEMO))
+    lib["globalExercises"] = [
+        {"id": "g1", "icon": "1", "name": "Squat", "muscle": "legs", "type": "reps",
+         "reps": "5", "sets": 5, "sithoehe": "", "kg": "100",
+         "pauseSecs": 180, "durationSecs": 90, "note": ""}]
+    body = """
+      const S=()=>w.eval('state');
+      w.openAddGex();
+      ok('a fresh form shows the default rest',
+         d.getElementById('gex-pause').classList.contains('is-default'), true);
+      d.getElementById('gex-name').value='Lunge';
+      w.saveGex();
+      const fresh=S().globalExercises.find(g=>g.name==='Lunge');
+      ok('a fresh exercise keeps the default rest', fresh.pauseSecs, null);
+      ok('a fresh exercise gets the default duration', fresh.durationSecs, 300);
+
+      w.openPlanDetail('p1'); w.showPlanTab('exercises');
+      w.pickGex(fresh.id); w.savePlanEx();
+      const planned=S().plans[0].exercises.find(e=>e.name==='Lunge');
+      ok('picked into a plan it still uses the default rest', planned.pauseSecs, null);
+
+      w.openEditGex('g1'); w.closeModal('modalAddGex');
+      w.openAddGex();
+      ok('after an edit the rest is not carried over',
+         d.getElementById('gex-pause').classList.contains('is-default'), true);
+      d.getElementById('gex-name').value='Step-up';
+      w.saveGex();
+      const after=S().globalExercises.find(g=>g.name==='Step-up');
+      ok('after an edit the new exercise has the default rest', after.pauseSecs, null);
+      ok('after an edit the new exercise has the default duration', after.durationSecs, 300);
+      ok('the edited exercise is untouched', S().globalExercises[0].pauseSecs, 180);
+
+      const b=d.createElement('button'); b.id='dur-probe'; d.body.appendChild(b);
+      b.dataset.secs='abc';
+      ok('an unreadable duration reads as unset', w.durFieldValue('dur-probe'), null);
+      delete b.dataset.secs;
+      ok('a never-set duration reads as unset', w.durFieldValue('dur-probe'), null);
+    """
+    report(drive(lib, body), "new exercise defaults")
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
@@ -1001,7 +1051,8 @@ def main():
               test_last_time_is_shown, test_a_personal_best_is_marked,
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history,
-              test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused):
+              test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused,
+              test_a_new_library_exercise_starts_from_defaults):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:

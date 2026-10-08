@@ -1465,7 +1465,10 @@ function durFieldSet(id,secs,nullable,defSecs){
 }
 function durFieldValue(id){
   const el=document.getElementById(id); if(!el) return null;
-  return el.dataset.secs===''?null:parseInt(el.dataset.secs,10);
+  // A button never passed through durFieldSet has no data-secs at all, and
+  // parseInt(undefined) is NaN -- which durFieldSet later reads as a set 0 s.
+  const n=parseInt(el.dataset.secs,10);
+  return Number.isFinite(n)?n:null;
 }
 function durFieldOpen(id,title,nullable,defSecs){
   openDurationPicker({title:title,value:durFieldValue(id),nullable:nullable,defaultSecs:defSecs,
@@ -2599,7 +2602,11 @@ function openAddGex(){
   buildIconPicker('iconPickerGex',ICONS[0],'selectIconGex'); selIconGex=ICONS[0];
   setGexType('reps');
   document.getElementById('gex-muscle-wrap').innerHTML = muscleSelectHTML('gex-muscle','');
-  ['gex-name','gex-reps','gex-sets','gex-sitz','gex-kg','gex-pause','gex-dur','gex-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['gex-name','gex-reps','gex-sets','gex-sitz','gex-kg','gex-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Rest and duration are buttons holding data-secs, so .value='' would not
+  // clear them and the last-edited exercise's values would carry over.
+  durFieldSet('gex-pause',null,true,state.globalPauseSecs);
+  durFieldSet('gex-dur',300,false,0);
   openModal('modalAddGex');
 }
 
