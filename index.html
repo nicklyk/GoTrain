@@ -1828,6 +1828,20 @@ function resetAdjust(){
   openDetail(currentExId);
 }
 
+// Did this history row actually happen? Every exercise in the plan gets a row
+// when a workout is finished, done or not, so a skipped exercise sits in
+// history as setsCompleted:0, done:false -- and reading it as "last time" put
+// the plan's numbers on a session that never had them. Done by hand counts
+// with no sets ticked (a timed exercise has none). A row from before either
+// field was recorded can't be told apart, so it is taken at its word.
+function rowWasDone(row){
+  if(!row) return false;
+  if(row.done===true) return true;
+  const n=parseInt(row.setsCompleted,10);
+  if(!isNaN(n)) return n>0;
+  return row.done===undefined;
+}
+
 // The last finished session that contained this exercise. Matched on id
 // first and then on name, because deleting an exercise and adding it back
 // gives it a new id while it is plainly the same movement to the person
@@ -1837,7 +1851,7 @@ function lastSessionFor(ex){
   const name=String(ex.name||'').trim().toLowerCase();
   for(const entry of (state.history||[])){
     for(const row of (entry.exercises||[])){
-      if(!row) continue;
+      if(!rowWasDone(row)) continue;
       const sameName=String(row.name||'').trim().toLowerCase();
       if(row.id===ex.id||(name&&sameName===name)) return {entry, row};
     }
@@ -1853,7 +1867,7 @@ function isPersonalBest(ex){
   const name=String(ex.name||'').trim().toLowerCase();
   let seen=false, best=0;
   (state.history||[]).forEach(entry=>(entry.exercises||[]).forEach(row=>{
-    if(!row) return;
+    if(!rowWasDone(row)) return;
     const sameName=String(row.name||'').trim().toLowerCase();
     if(row.id!==ex.id&&!(name&&sameName===name)) return;
     const v=parseFloat(String(row.kg||'').replace(',','.'));

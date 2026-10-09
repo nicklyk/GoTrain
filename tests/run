@@ -670,6 +670,70 @@ def test_a_personal_best_is_marked():
     run("60", [], "a first-ever session is not", False)
 
 
+def test_a_skipped_exercise_is_not_last_time():
+    print("\nlast time skips undone rows (browser)")
+    if not browser():
+        skip("last time skips undone rows", "no chromium found")
+        return
+    # Finishing a workout writes a row for every exercise in the plan, done or
+    # not. The newer session here is one where Bench was never touched; it
+    # must not be reported as "last time", nor hide a real new best.
+    skipped = _session("s2", "2026-09-20T18:00:00Z", "80")
+    skipped["exercises"][0].update(setsCompleted=0, done=False)
+    done = _session("s1", "2026-09-10T18:00:00Z", "57,5")
+    st = _with_history([skipped, done])
+    body = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      const txt=d.getElementById('d-last').textContent;
+      const st=w.eval('state');
+      ok('the untouched session is not reported', txt.indexOf('80 kg'), -1);
+      ok('the last session actually done is', txt.indexOf('57,5 kg') >= 0, true);
+      ok('with its own date', txt.indexOf(w.entryDate(st.history[1])) >= 0, true);
+      ok('and its sets', txt.indexOf('3\u00d78') >= 0, true);
+      ok('60 kg is a new best over 57,5', txt.indexOf('\u2605') >= 0, true);
+    """
+    report(drive(st, body), "skipped row")
+
+    # Starting a workout and finishing it straight away used to make
+    # "Last time ... today" appear with the plan's own numbers.
+    body2 = """
+      w.confirm=()=>true;
+      w.startWithPlan('p1'); w.finishWorkout();
+      ok('the empty workout was recorded', w.eval('state').history.length, 1);
+      w.startWithPlan('p1'); w.openDetail('x1');
+      ok('an empty workout gives no last time',
+         d.getElementById('d-last').style.display, 'none');
+    """
+    report(drive(DEMO, body2), "empty workout")
+
+    # What still counts: a timed exercise marked done (it has no sets), a
+    # partly done one, and a row from before setsCompleted/done were stored.
+    timed = _session("s3", "2026-09-20T18:00:00Z", "", name="Row", exid="x2")
+    timed["exercises"][0].update(type="time", durationSecs=480, setsCompleted=0, done=True)
+    partial = _session("s4", "2026-09-21T18:00:00Z", "50")
+    partial["exercises"][0].update(setsCompleted=1, done=False)
+    body3 = """
+      w.startWithPlan('p1'); w.openDetail('x2');
+      ok('a timed exercise marked done is reported',
+         d.getElementById('d-last').textContent.indexOf('8:00') >= 0, true);
+      w.openDetail('x1');
+      const txt=d.getElementById('d-last').textContent;
+      ok('a partly done session is reported', txt.indexOf('50 kg') >= 0, true);
+      ok('with the sets actually done', txt.indexOf('1\u00d78') >= 0, true);
+    """
+    report(drive(_with_history([partial, timed]), body3), "done rows")
+
+    legacy = _session("s5", "2026-09-01T18:00:00Z", "45")
+    del legacy["exercises"][0]["setsCompleted"]
+    del legacy["exercises"][0]["done"]
+    body4 = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      ok('a row older than setsCompleted is still trusted',
+         d.getElementById('d-last').textContent.indexOf('45 kg') >= 0, true);
+    """
+    report(drive(_with_history([legacy]), body4), "legacy row")
+
+
 def test_rest_can_be_adjusted_while_running():
     print("\nadjusting the rest (browser)")
     if not browser():
@@ -999,6 +1063,7 @@ def main():
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
               test_adjusting_keeps_a_hand_completed_exercise_done,
               test_last_time_is_shown, test_a_personal_best_is_marked,
+              test_a_skipped_exercise_is_not_last_time,
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history,
               test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused):
