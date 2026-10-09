@@ -1,18 +1,18 @@
 # Backlog
 
-Updated 2026-10-08 by the scout. Edit freely: reorder lines, delete what you don't
+Updated 2026-10-09 by the scout. Edit freely: reorder lines, delete what you don't
 want, add notes. The nightly build takes the highest item without an open PR.
 
 ## Top ten
 
-1. **B-17 · GoTrain · "Last time" shows a session where the exercise wasn't done**
-   Why: `lastSessionFor` (~1835) returns any history row, even `setsCompleted:0, done:false`, and `renderLastTime` (~1876) falls back via `row.setsCompleted||row.sets`, so zero sets reads as "3×8". `isPersonalBest` (~1850) counts those rows too, hiding a real new best. Reproduced: 20 Sep (80 kg, 0 sets, not done) and 10 Sep (57,5 kg, 3 sets, done); Bench at 60 kg shows "Last time 80 kg · 3×8 · 20 Sep" and no New best (expected 57,5 kg, 10 Sep, ★). Starting and immediately finishing a workout makes "Last time … today" appear with the plan's numbers.
-   Verify: browser test with that two-entry fixture asserts date, kg and the ★; a row with 0 sets done is never shown.
-   Size: small
-
-2. **B-25 · GoTrain · Changing an exercise's sets in the plan editor mid-workout leaves its progress wrong**
+1. **B-25 · GoTrain · Changing an exercise's sets in the plan editor mid-workout leaves its progress wrong**
    Why: `savePlanEx` (~2730) writes the new `sets` but never calls `clampSets`, unlike "Adjust for today". Reproduced in headless Chromium: tick 3/3 of Bench, edit the plan to 2 sets, finish → `getSets('x1')` stays 3 and the history row reads "3/2 sets". Related, same function family: `clampSets` (~1899) only ever withdraws done, so ticking 2 of 3 and then adjusting to 2 sets leaves both rows ticked but `isDone` false, the ring at 0% and Complete still enabled (reproduced).
    Verify: browser test: tick 3/3, edit the plan to 2 sets → `getSets==2` and the finished history row reads 2/2; tick 2/3, adjust to 2 → `isDone` true and the ring matches what `completeSet` gives for the last set. Keep B-10's rule: done set by hand is not withdrawn unless sets were added.
+   Size: small
+
+2. **B-28 · GoTrain · "Start new workout" on a paused workout neither saves nor clears it**
+   Why: after a reload (or iOS killing the PWA) a workout with ticked sets comes back as "WORKOUT PAUSED" with a "Start new workout" button. That button only opens `openPlanSelectModal` (~1654), and `startWithPlan` (~1633) switches `activePlanId` with no confirm, no `saveHistory`, no reset. Reproduced in headless Chromium (p1 with Bench 2/3 ticked, paused): pick p2 → no question asked, history stays empty, p1's 2 sets sit in `state.progress`; finish p2 → history holds only Legs, the paused session never reaches History; start p1 days later → it opens with the old 2 sets ticked. Picking the *same* plan from "Start new workout" just resumes it (`getSets('x1')` stays 2). `newWorkout` (~3072) already has the right rule: confirm, `saveHistory` if anything was done, then `emptyProgress`.
+   Verify: browser test with that fixture: "Start new workout" → any plan asks once; accepting writes the paused session to history (Bench 2 sets) and clears p1's progress, so p1 then starts at 0; cancelling changes nothing; with no paused progress the button starts a plan without asking, as today. The resume banner keeps resuming.
    Size: small
 
 3. **B-18 · omarchy-gotrain · `sync` and the panel's "N waiting" count still disagree**
@@ -57,7 +57,7 @@ want, add notes. The nightly build takes the highest item without an open PR.
 
 ## Candidates that did not make the ten
 
-In progress, not in the ten while their PR is open: **B-14** · omarchy-gotrain · A broken config is wiped by `config set` and blanks the bar — https://github.com/nicklyk/omarchy-gotrain/pull/4 (draft); **B-24** · omarchy-gotrain · "Latest workout" and the sync cursor are picked by sorting timestamp text — https://github.com/nicklyk/omarchy-gotrain/pull/5; **B-15** · GoTrain · A new library exercise gets a 0-second rest, or the last-edited exercise's values — https://github.com/nicklyk/GoTrain/pull/5.
+In progress, not in the ten while their PR is open: **B-17** · GoTrain · "Last time" shows a session where the exercise wasn't done — https://github.com/nicklyk/GoTrain/pull/6; **B-14** · omarchy-gotrain · A broken config is wiped by `config set` and blanks the bar — https://github.com/nicklyk/omarchy-gotrain/pull/4 (draft); **B-24** · omarchy-gotrain · "Latest workout" and the sync cursor are picked by sorting timestamp text — https://github.com/nicklyk/omarchy-gotrain/pull/5; **B-15** · GoTrain · A new library exercise gets a 0-second rest, or the last-edited exercise's values — https://github.com/nicklyk/GoTrain/pull/5.
 
 Reproduced, but smaller: `list -n 0` says "no workouts yet" and `-n -1` returns everything (`LIMIT -1`); switching language mid-workout puts the workout header ("PLAN · TRAINING LÄUFT") on the Settings screen (`changeLang` ~1317); the export filename uses the UTC date (`exportFilename` ~2831), so a 00:30 export is named for yesterday; finishing a workout with nothing done still writes a history entry (`finishWorkout` ~1642 lacks `newWorkout`'s `hasProgress` guard — owner's call); `stats` prints first/last dates in UTC; `status` prints "None days ago" for undated workouts; `export --csv -o` miscounts rows when a name contains a newline, and `durationSecs: true` exports as a number. Read in code only: `BarWidget.qml:36` may leave `%25`/`%23` in the CLI path, and `Panel.qml:248` quotes path and argument as one string; README lists `origin` as a config key but `load_config` always overwrites it; `doctor` shows the total pending count on every watch-folder row and assumes a /24; `import a b` stops at the first bad file after committing the earlier ones; German confirms spelled `zuruecksetzen`/`loeschen` (index.html ~854-855); `deletePhase` doesn't refresh the phase count in `pd-meta`; a 0:00 duration becomes 5:00 through `||300`; changing an exercise's phase in the plan editor (`changeExPhase` ~2508) doesn't re-render, so its row still names the old phase; a rest overlay restored after reload has an empty "next set" line; the phone's `syncPayload` (index.html ~2972) still compares `ts>sinceTs` as text, so it relies on the desktop sending a `Z` cursor (B-24 fixes the sender; parsing both with `Date.parse` would be belt and braces).
 
