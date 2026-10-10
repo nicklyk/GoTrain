@@ -1909,19 +1909,38 @@ function renderLastTime(ex){
   box.style.display='';
 }
 
-function setCountOf(exId){ const ex=getEx(exId); return ex?parseInt(ex.sets,10)||0:0; }
+// The plan editor can change any plan, and a plan that is not the active one
+// can still hold a paused session, so these take the plan explicitly when
+// given one. Without it they read the active plan, exactly as getEx does.
+function exInPlan(exId,planId){
+  if(planId==null) return getEx(exId);
+  const plan=getPlanById(planId), base=plan&&plan.exercises.find(e=>e.id===exId);
+  if(!base) return base;
+  return Object.assign({}, base, getProg(planId).overrides[exId]||{});
+}
+function setCountOf(exId,planId){ const ex=exInPlan(exId,planId); return ex?parseInt(ex.sets,10)||0:0; }
 
 // Lowering the set count below what is already ticked off would leave the
 // exercise reporting more completed sets than it has.
-function clampSets(exId,prevMax){
-  const ex=getEx(exId); if(!ex||ex.type==='time') return;
-  const max=parseInt(ex.sets,10)||0;
-  if(getSets(exId)>max){ setSets(exId,max); }
+function clampSets(exId,prevMax,planId){
+  const ex=exInPlan(exId,planId); if(!ex||ex.type==='time') return;
+  const prog=getProg(planId==null?state.activePlanId:planId);
+  // The plan editor's number field has min="1" but still accepts a typed
+  // "-1", and a negative count must not reach the stored ticked sets.
+  const max=Math.max(0,parseInt(ex.sets,10)||0);
+  if((prog.completedSets[exId]||0)>max) prog.completedSets[exId]=max;
+  const sets=prog.completedSets[exId]||0;
+  const done=()=>prog.doneExercises.includes(exId);
   // Only withdraw "done" when this adjustment actually added sets that are
   // not ticked off yet. Finishing an exercise with the button without ticking
   // every set is a deliberate choice, and changing today's weight afterwards
   // used to undo it silently.
-  if(max>0&&getSets(exId)<max&&max>(prevMax==null?0:prevMax)) unsetDone(exId);
+  if(max>0&&sets<max&&max>(prevMax==null?0:prevMax))
+    prog.doneExercises=prog.doneExercises.filter(x=>x!==exId);
+  // Lowering the count to what is already ticked finishes the exercise, the
+  // same as ticking its last set would. Otherwise every set reads as done
+  // while the exercise does not, the ring ignores it and Complete stays lit.
+  else if(max>0&&sets>=max&&!done()) prog.doneExercises.push(exId);
 }
 
 function renderSetRows(ex){
@@ -2765,9 +2784,16 @@ function savePlanEx(){
     phaseId:document.getElementById('mce-phase')?document.getElementById('mce-phase').value||null:null
   };
   const plan=getPlanById(editingPlanId);
+  // A session already under way in this plan (running or paused) has sets
+  // ticked against the old count; it is reconciled below like "Adjust for
+  // today" does. Checked first so editing a plan never creates progress for it.
+  const inSession=editingPlanExId&&!!state.progress[editingPlanId];
+  const before=inSession?setCountOf(editingPlanExId,editingPlanId):null;
   if(editingPlanExId){ const idx=plan.exercises.findIndex(e=>e.id===editingPlanExId); if(idx>=0) plan.exercises[idx]={...plan.exercises[idx],...data}; }
   else plan.exercises.push({id:uid(),...data});
+  if(inSession) clampSets(editingPlanExId,before,editingPlanId);
   saveState(); closeModal('modalCustomizeEx'); renderPlanExercises();
+  if(editingPlanId===state.activePlanId) updateProgress();
   document.getElementById('pd-meta').textContent=plan.phases.length+' '+t('phases')+' · '+plan.exercises.length+' '+t('exercises');
 }
 

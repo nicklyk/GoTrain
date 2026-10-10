@@ -600,6 +600,90 @@ def test_adjusting_keeps_a_hand_completed_exercise_done():
     report(drive(DEMO, body), "adjust")
 
 
+def test_changing_sets_keeps_progress_consistent():
+    print("\nchanging the set count mid-workout (browser)")
+    if not browser():
+        skip("set count change", "no chromium found")
+        return
+    st = json.loads(json.dumps(DEMO))
+    # A second plan with a paused session of its own, to show the plan editor
+    # reconciles the plan it edits rather than whichever one is running.
+    p2 = json.loads(json.dumps(DEMO["plans"][0]))
+    p2["id"], p2["name"] = "p2", "Other"
+    p2["exercises"][0]["id"], p2["exercises"][1]["id"] = "y1", "y2"
+    st["plans"].append(p2)
+    st["progress"] = {"p2": {"completedSets": {"y1": 3}, "doneExercises": ["y1"], "overrides": {}}}
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      const realConfirm=w.confirm; w.confirm=()=>true;
+      const S=()=>w.eval('state');
+      const editSets=(plan,ex,n)=>{ w.openPlanDetail(plan); w.showPlanTab('exercises');
+        w.openEditPlanEx(ex); d.getElementById('mce-sets').value=String(n); w.savePlanEx(); };
+
+      // 1. All three sets ticked, then the plan is edited down to two.
+      w.startWithPlan('p1'); w.openDetail('x1');
+      w.completeSet('x1',1); w.completeSet('x1',2); w.completeSet('x1',3);
+      editSets('p1','x1',2);
+      ok('plan edit: ticked sets follow the new count', w.getSets('x1'), 2);
+      ok('plan edit: the exercise stays done', w.isDone('x1'), true);
+      w.finishWorkout();
+      const row=S().history[0].exercises.find(e=>e.id==='x1');
+      ok('plan edit: history records 2 of 2 sets', row.setsCompleted+'/'+row.sets, '2/2');
+
+      // 2. Two of three ticked, then lowered to two: that is a finished
+      //    exercise, exactly as ticking its last set would make it.
+      editSets('p1','x1',3);
+      w.startWithPlan('p1'); w.openDetail('x1');
+      w.completeSet('x1',1); w.completeSet('x1',2);
+      ok('adjust: not done with 2 of 3', w.isDone('x1'), false);
+      w.openAdjust(); d.getElementById('adj-sets').value='2'; w.saveAdjust();
+      ok('adjust: lowering to the ticked count finishes it', w.isDone('x1'), true);
+      ok('adjust: the ring counts it', d.getElementById('prTxt').textContent, '50%');
+      ok('adjust: Complete is no longer offered', d.getElementById('d-done-btn').disabled, true);
+      // Resetting the adjustment brings the third set back, unticked.
+      w.openDetail('x1'); w.resetAdjust();
+      ok('reset: the restored set withdraws done', w.isDone('x1'), false);
+      ok('reset: the ticked sets are kept', w.getSets('x1'), 2);
+      // The same through the plan editor, with no adjustment in the way:
+      // an adjustment for today outranks the plan, so it would mask the edit.
+      editSets('p1','x1',2);
+      ok('plan edit: lowering to the ticked count finishes it', w.isDone('x1'), true);
+      ok('plan edit: the ring counts it', d.getElementById('prTxt').textContent, '50%');
+
+      // 3. B-10's rule still holds: done by hand is kept unless sets are added.
+      w.undoExDone(); w.openDetail('x1'); w.markExDone();
+      editSets('p1','x1',1);
+      ok('done by hand survives fewer sets', w.isDone('x1'), true);
+      ok('and no sets were invented', w.getSets('x1'), 0);
+      editSets('p1','x1',4);
+      ok('adding sets withdraws done', w.isDone('x1'), false);
+
+      // A negative count typed into the plan editor never makes the ticked
+      // sets negative.
+      w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2);
+      editSets('p1','x1',-1);
+      ok('a negative count leaves no negative ticked sets', w.getSets('x1'), 0);
+      editSets('p1','x1',4);
+
+      // 4. Editing another plan reconciles that plan's paused session and
+      //    leaves the running one alone.
+      const runningBefore=JSON.stringify(S().progress.p1);
+      editSets('p2','y1',2);
+      ok('paused plan: its ticked sets follow its count', S().progress.p2.completedSets.y1, 2);
+      ok('paused plan: it stays done', S().progress.p2.doneExercises.indexOf('y1')>=0, true);
+      ok('the running session is untouched', JSON.stringify(S().progress.p1), runningBefore);
+      ok('the active plan did not change', S().activePlanId, 'p1');
+      ok('and it was saved', JSON.parse(w.localStorage.getItem('tp4_state')).progress.p2.completedSets.y1, 2);
+
+      // 5. Editing a plan with no session must not create one for it.
+      delete S().progress.p2;
+      editSets('p2','y1',5);
+      ok('no progress is created for an idle plan', 'p2' in S().progress, false);
+      w.confirm=realConfirm;
+    """
+    report(drive(st, body), "set count")
+
+
 def _with_history(sessions):
     st = json.loads(json.dumps(DEMO))
     st["history"] = sessions
@@ -1111,7 +1195,7 @@ def main():
               test_manifest, test_syntax_and_licence,
               test_timers_survive_a_locked_screen, test_duration_migration,
               test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
-              test_adjusting_keeps_a_hand_completed_exercise_done,
+              test_adjusting_keeps_a_hand_completed_exercise_done, test_changing_sets_keeps_progress_consistent,
               test_last_time_is_shown, test_a_personal_best_is_marked,
               test_a_skipped_exercise_is_not_last_time,
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
