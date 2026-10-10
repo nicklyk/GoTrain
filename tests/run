@@ -658,6 +658,13 @@ def test_changing_sets_keeps_progress_consistent():
       editSets('p1','x1',4);
       ok('adding sets withdraws done', w.isDone('x1'), false);
 
+      // A negative count typed into the plan editor never makes the ticked
+      // sets negative.
+      w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2);
+      editSets('p1','x1',-1);
+      ok('a negative count leaves no negative ticked sets', w.getSets('x1'), 0);
+      editSets('p1','x1',4);
+
       // 4. Editing another plan reconciles that plan's paused session and
       //    leaves the running one alone.
       const runningBefore=JSON.stringify(S().progress.p1);

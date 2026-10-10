@@ -1908,7 +1908,9 @@ function setCountOf(exId,planId){ const ex=exInPlan(exId,planId); return ex?pars
 function clampSets(exId,prevMax,planId){
   const ex=exInPlan(exId,planId); if(!ex||ex.type==='time') return;
   const prog=getProg(planId==null?state.activePlanId:planId);
-  const max=parseInt(ex.sets,10)||0;
+  // The plan editor's number field has min="1" but still accepts a typed
+  // "-1", and a negative count must not reach the stored ticked sets.
+  const max=Math.max(0,parseInt(ex.sets,10)||0);
   if((prog.completedSets[exId]||0)>max) prog.completedSets[exId]=max;
   const sets=prog.completedSets[exId]||0;
   const done=()=>prog.doneExercises.includes(exId);
