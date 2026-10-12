@@ -1,65 +1,71 @@
 # Backlog
 
-Updated 2026-10-09 by the scout. Edit freely: reorder lines, delete what you don't
+Updated 2026-10-12 by the scout. Edit freely: reorder lines, delete what you don't
 want, add notes. The nightly build takes the highest item without an open PR.
 
 ## Top ten
 
-1. **B-25 · GoTrain · Changing an exercise's sets in the plan editor mid-workout leaves its progress wrong**
-   Why: `savePlanEx` (~2730) writes the new `sets` but never calls `clampSets`, unlike "Adjust for today". Reproduced in headless Chromium: tick 3/3 of Bench, edit the plan to 2 sets, finish → `getSets('x1')` stays 3 and the history row reads "3/2 sets". Related, same function family: `clampSets` (~1899) only ever withdraws done, so ticking 2 of 3 and then adjusting to 2 sets leaves both rows ticked but `isDone` false, the ring at 0% and Complete still enabled (reproduced).
-   Verify: browser test: tick 3/3, edit the plan to 2 sets → `getSets==2` and the finished history row reads 2/2; tick 2/3, adjust to 2 → `isDone` true and the ring matches what `completeSet` gives for the last set. Keep B-10's rule: done set by hand is not withdrawn unless sets were added.
-   Size: small
-
-2. **B-28 · GoTrain · "Start new workout" on a paused workout neither saves nor clears it**
-   Why: after a reload (or iOS killing the PWA) a workout with ticked sets comes back as "WORKOUT PAUSED" with a "Start new workout" button. That button only opens `openPlanSelectModal` (~1654), and `startWithPlan` (~1633) switches `activePlanId` with no confirm, no `saveHistory`, no reset. Reproduced in headless Chromium (p1 with Bench 2/3 ticked, paused): pick p2 → no question asked, history stays empty, p1's 2 sets sit in `state.progress`; finish p2 → history holds only Legs, the paused session never reaches History; start p1 days later → it opens with the old 2 sets ticked. Picking the *same* plan from "Start new workout" just resumes it (`getSets('x1')` stays 2). `newWorkout` (~3072) already has the right rule: confirm, `saveHistory` if anything was done, then `emptyProgress`.
+1. **B-28 · GoTrain · "Start new workout" on a paused workout neither saves nor clears it**
+   Why: after a reload (or iOS killing the PWA) a workout with ticked sets comes back as "WORKOUT PAUSED" with a "Start new workout" button. That button only opens `openPlanSelectModal` (~1657), and `startWithPlan` (~1636) switches `activePlanId` with no confirm, no `saveHistory`, no reset. Reproduced in headless Chromium (p1 with Bench 2/3 ticked, paused): pick p2 → no question asked, history stays empty, p1's 2 sets sit in `state.progress`; finish p2 → history holds only Legs, the paused session never reaches History; start p1 days later → it opens with the old 2 sets ticked. Picking the *same* plan from "Start new workout" just resumes it (`getSets('x1')` stays 2). `newWorkout` (~3119) already has the right rule: confirm, `saveHistory` if anything was done, then `emptyProgress`.
    Verify: browser test with that fixture: "Start new workout" → any plan asks once; accepting writes the paused session to history (Bench 2 sets) and clears p1's progress, so p1 then starts at 0; cancelling changes nothing; with no paused progress the button starts a plan without asking, as today. The resume banner keeps resuming.
    Size: small
 
-3. **B-18 · omarchy-gotrain · `sync` and the panel's "N waiting" count still disagree**
-   Why: B-8 made `pending` count only un-imported files, but `sync` without `--all` still imports only `found[:1]` (~1010), the newest file, even when it is already imported or unreadable. Reproduced: an older un-imported export plus a newer already-imported one → `sync` says "already imported, nothing to do", panel keeps `pending 1` forever. Add a newest `{"broken` file → `pending 2`, `sync` exits 1 "nothing could be imported". Invalid JSON is counted although the docstring says unreadable files aren't. Keep B-4's concern in mind (an older export must not restore an older library): the simplest fix is making `pending` report what `sync` would do.
-   Verify: new test with that two-file scenario: after `sync`, `pending` is 0 or equals what `sync` would import next; a broken newest file is not counted and does not block a valid one.
-   Size: small
 
-4. **B-19 · GoTrain · Deleting the active plan mid-workout leaves the workout running**
-   Why: `deletePlanById`/`deletePlanModal` (~2812) don't end the workout. Reproduced: start p1, tick set 1, delete p1 → the rest overlay keeps counting for an exercise that no longer exists, `workoutMode` stays `'active'` so the other plan renders as the running workout, the wake lock is held, and `state.progress['p1']` stays in storage and every export.
+2. **B-19 · GoTrain · Deleting the active plan mid-workout leaves the workout running**
+   Why: `deletePlanById`/`deletePlanModal` (~2859) don't end the workout. Reproduced: start p1, tick set 1, delete p1 → the rest overlay keeps counting for an exercise that no longer exists, `workoutMode` stays `'active'` so the other plan renders as the running workout, the wake lock is held, and `state.progress['p1']` stays in storage and every export.
    Verify: browser test: after that delete, overlay inactive, `workoutMode==='home'`, `'p1' in state.progress` false, wake lock released (stubbed); deleting a non-active plan leaves the running workout alone.
    Size: small
 
-5. **B-20 · GoTrain · Reset leaves the timers key, so a rest overlay appears over the fresh app**
-   Why: "Delete all data" (`confirmResetAll` ~3081) removes `tp4_state` but not `tp4_timers`. Reproduced: with a rest running, reset → the empty, plan-less app comes back with the rest overlay counting. Same area: `newWorkout` (~3072) calls `clearAllTimers()` but not `onWorkoutEnded()`, so the wake lock is never released (reproduced: 1 request, 0 releases) — fold that one-liner in.
-   Verify: browser test: reset with a rest running → no `tp4_timers` in localStorage, overlay inactive after reload; `newWorkout` releases the lock (stubbed).
-   Size: small
 
-6. **B-22 · GoTrain · Creating a plan mid-workout hijacks the running workout**
-   Why: `createPlan` (~2757) sets `state.activePlanId` to the new plan unconditionally, while `workoutMode` stays `'active'`. Reproduced in headless Chromium: `startWithPlan(p1)` → Plans → "+ new plan" → `activePlanId` is the new empty plan and the workout screen shows it as the running workout; finishing then writes a history entry for the empty plan, and p1's ticked sets sit in `state.progress` unseen. The modal also leaves `#newPlanName` filled for the next plan. Same family as B-19, but a separate code path.
+3. **B-22 · GoTrain · Creating a plan mid-workout hijacks the running workout**
+   Why: `createPlan` (~2804) sets `state.activePlanId` to the new plan unconditionally, while `workoutMode` stays `'active'`. Reproduced in headless Chromium: `startWithPlan(p1)` → Plans → "+ new plan" → `activePlanId` is the new empty plan and the workout screen shows it as the running workout; finishing then writes a history entry for the empty plan, and p1's ticked sets sit in `state.progress` unseen. The modal also leaves `#newPlanName` filled for the next plan. Same family as B-19, but a separate code path.
    Verify: browser test: start p1, tick a set, create a plan → `activePlanId===p1`, p1's progress intact, `#newPlanName` empty; with no workout running, a new plan still becomes active as today.
    Size: small
 
+
+4. **B-20 · GoTrain · Reset leaves the timers key, so a rest overlay appears over the fresh app**
+   Why: "Delete all data" (`confirmResetAll` ~3128) removes `tp4_state` but not `tp4_timers`. Reproduced: with a rest running, reset → the empty, plan-less app comes back with the rest overlay counting. Same area: `newWorkout` (~3119) calls `clearAllTimers()` but not `onWorkoutEnded()`, so the wake lock is never released (reproduced: 1 request, 0 releases) — fold that one-liner in.
+   Verify: browser test: reset with a rest running → no `tp4_timers` in localStorage, overlay inactive after reload; `newWorkout` releases the lock (stubbed).
+   Size: small
+
+
+5. **B-18 · omarchy-gotrain · `sync` and the panel's "N waiting" count still disagree**
+   Why: B-8 made `pending` count only un-imported files, but `sync` without `--all` still imports only `found[:1]` (~1064), the newest file, even when it is already imported or unreadable. Reproduced: an older un-imported export plus a newer already-imported one → `sync` says "already imported, nothing to do", panel keeps `pending 1` forever. Add a newest `{"broken` file → `pending 2`, `sync` exits 1 "nothing could be imported". Invalid JSON is counted although the docstring says unreadable files aren't. Keep B-4's concern in mind (an older export must not restore an older library): the simplest fix is making `pending` report what `sync` would do.
+   Verify: new test with that two-file scenario: after `sync`, `pending` is 0 or equals what `sync` would import next; a broken newest file is not counted and does not block a valid one.
+   Size: small
+
+
+6. **B-27 · GoTrain · A single history entry cannot be deleted**
+    Why: there is no path that removes one entry from `state.history` (`renderHistory`/`openHistoryDetail` ~3169-3210 offer none; the only way out is "Delete all data"). A workout finished by mistake -- including the empty one `finishWorkout` writes when nothing was done -- stays in History for good and feeds "Last time" and New best. A delete button on the history detail screen, behind a `confirm`, removing that one entry by id. Caveat for the PR text: the desktop archive merges and never deletes, so a later restore from `gotrain export` brings the entry back; the PR should say so, not try to fix it.
+    Verify: browser test: two entries, delete one from its detail screen → `state.history` holds only the other (persisted in `tp4_state`), the list re-renders, other entries untouched; cancelling the confirm changes nothing. New keys in both `T.de` and `T.en`.
+    Size: small
+
 7. **B-26 · GoTrain · Starting one timed exercise's countdown wipes another's paused countdown**
-   Why: there is a single `timers.ex` slot (`etRecord`/`etToggle` ~2165), so starting any timed exercise overwrites the held countdown of the previous one. Reproduced in headless Chromium: start Row (8:00), let it reach 6:20, go back, start Plank, go back to Row → it shows 8:00 and the 100 s are lost. Natural in a circuit or when two timed exercises share a phase.
+   Why: there is a single `timers.ex` slot (`etRecord`/`etToggle` ~2201), so starting any timed exercise overwrites the held countdown of the previous one. Reproduced in headless Chromium: start Row (8:00), let it reach 6:20, go back, start Plank, go back to Row → it shows 8:00 and the 100 s are lost. Natural in a circuit or when two timed exercises share a phase.
    Verify: browser test with those steps: Row reopens at 6:20 (±1 s) and Plank keeps its own state. Key the record by exercise id like `timers.sw`, and still read the old single-slot shape from an existing `tp4_timers` after the update.
    Size: small
 
+
 8. **B-21 · omarchy-gotrain · `progress NAME` misses non-ASCII names and blames the archive**
-   Why: the name match uses SQLite `lower()` (~702), which folds ASCII only, so `progress überkopfdrücken` misses "Überkopfdrücken" — the owner's German exercise names are exactly where this bites. Any miss, a plain typo included ("Bench Pres", reproduced), says "no load data yet -- import a workout that has one", which is wrong with a full archive.
+   Why: the name match uses SQLite `lower()` (~756), which folds ASCII only, so `progress überkopfdrücken` misses "Überkopfdrücken" — the owner's German exercise names are exactly where this bites. Any miss, a plain typo included ("Bench Pres", reproduced), says "no load data yet -- import a workout that has one", which is wrong with a full archive.
    Verify: new test: `progress überkopfdrücken` finds "Überkopfdrücken" (match with Python `casefold()` instead of SQL `lower()`); a name with no match says no exercise by that name was found, and suggests the closest names (`difflib`, stdlib) rather than blaming the archive.
    Size: small
+
 
 9. **B-23 · omarchy-gotrain · Piping `list`, `stats` or `export` into `head` ends in a traceback**
    Why: closing stdout early raises `BrokenPipeError` out of `main`, so `gotrain list | head` and `gotrain export | head -c 100` print a Python traceback (reproduced on a 3000-workout archive). Ordinary shell use, and the traceback reads like archive damage.
    Verify: new test pipes `list`, `stats` and `export` into a reader that closes after one line: exit status is not a traceback, stderr has no `Traceback`. Catch it in `main` and point stdout at `os.devnull`; no `SIG_DFL` around archive writes, so an interrupted import still rolls back.
    Size: small
 
-10. **B-27 · GoTrain · A single history entry cannot be deleted**
-    Why: there is no path that removes one entry from `state.history` (`renderHistory`/`openHistoryDetail` ~3122-3170 offer none; the only way out is "Delete all data"). A workout finished by mistake -- including the empty one `finishWorkout` writes when nothing was done -- stays in History for good and feeds "Last time" and New best. A delete button on the history detail screen, behind a `confirm`, removing that one entry by id. Caveat for the PR text: the desktop archive merges and never deletes, so a later restore from `gotrain export` brings the entry back; the PR should say so, not try to fix it.
-    Verify: browser test: two entries, delete one from its detail screen → `state.history` holds only the other (persisted in `tp4_state`), the list re-renders, other entries untouched; cancelling the confirm changes nothing. New keys in both `T.de` and `T.en`.
+
+10. **B-29 · GoTrain · The rest overlay forgets which set it is resting for**
+    Why: `timers.rest` (`startPauseTimer` ~2158) stores only `{endAt,total}`; the "Set n/m" line is written once into `#tovNext` by `completeSet` (~2044) and never again. So when the rest is restored after a reload, or after iOS kills the PWA while you rest (the common case on the owner's phone), the overlay counts down with an empty line under it (reproduced by an earlier scout run; the code is unchanged in v37). The same one-shot write is why the overlay keeps saying "Set 3/3" after the set count is lowered while a rest runs (left open in PR #7's notes). Store `exId` and the next set number in `timers.rest` and render the line from it in `renderRestTimer`; an old `tp4_timers` without them shows no line, as today, rather than throwing.
+    Verify: browser test: tick set 1 of 3, reload with the rest running → overlay reads "Set 2/3"; a stored `{endAt,total}` record from before the change still restores and counts with no line and no error.
     Size: small
 
 ## Candidates that did not make the ten
 
-In progress, not in the ten while their PR is open: **B-17** · GoTrain · "Last time" shows a session where the exercise wasn't done — https://github.com/nicklyk/GoTrain/pull/6; **B-14** · omarchy-gotrain · A broken config is wiped by `config set` and blanks the bar — https://github.com/nicklyk/omarchy-gotrain/pull/4 (draft); **B-24** · omarchy-gotrain · "Latest workout" and the sync cursor are picked by sorting timestamp text — https://github.com/nicklyk/omarchy-gotrain/pull/5; **B-15** · GoTrain · A new library exercise gets a 0-second rest, or the last-edited exercise's values — https://github.com/nicklyk/GoTrain/pull/5.
-
-Reproduced, but smaller: `list -n 0` says "no workouts yet" and `-n -1` returns everything (`LIMIT -1`); switching language mid-workout puts the workout header ("PLAN · TRAINING LÄUFT") on the Settings screen (`changeLang` ~1317); the export filename uses the UTC date (`exportFilename` ~2831), so a 00:30 export is named for yesterday; finishing a workout with nothing done still writes a history entry (`finishWorkout` ~1642 lacks `newWorkout`'s `hasProgress` guard — owner's call); `stats` prints first/last dates in UTC; `status` prints "None days ago" for undated workouts; `export --csv -o` miscounts rows when a name contains a newline, and `durationSecs: true` exports as a number. Read in code only: `BarWidget.qml:36` may leave `%25`/`%23` in the CLI path, and `Panel.qml:248` quotes path and argument as one string; README lists `origin` as a config key but `load_config` always overwrites it; `doctor` shows the total pending count on every watch-folder row and assumes a /24; `import a b` stops at the first bad file after committing the earlier ones; German confirms spelled `zuruecksetzen`/`loeschen` (index.html ~854-855); `deletePhase` doesn't refresh the phase count in `pd-meta`; a 0:00 duration becomes 5:00 through `||300`; changing an exercise's phase in the plan editor (`changeExPhase` ~2508) doesn't re-render, so its row still names the old phase; a rest overlay restored after reload has an empty "next set" line; the phone's `syncPayload` (index.html ~2972) still compares `ts>sinceTs` as text, so it relies on the desktop sending a `Z` cursor (B-24 fixes the sender; parsing both with `Date.parse` would be belt and braces).
+Reproduced, but smaller: `list -n 0` says "no workouts yet" and `-n -1` returns everything (`LIMIT -1`); switching language mid-workout puts the workout header ("PLAN · TRAINING LÄUFT") on the Settings screen (`changeLang` ~1317); the export filename uses the UTC date (`exportFilename` ~2878), so a 00:30 export is named for yesterday; finishing a workout with nothing done still writes a history entry (`finishWorkout` ~1645 lacks `newWorkout`'s `hasProgress` guard — owner's call); `stats` prints first/last dates in UTC; `export --csv -o` miscounts rows when a name contains a newline, and `durationSecs: true` exports as a number. Read in code only: `BarWidget.qml:36` may leave `%25`/`%23` in the CLI path, and `Panel.qml:248` quotes path and argument as one string; README lists `origin` as a config key but `load_config` always overwrites it; `doctor` shows the total pending count on every watch-folder row and assumes a /24; `import a b` stops at the first bad file after committing the earlier ones; German confirms spelled `zuruecksetzen`/`loeschen` (index.html ~854-855); `deletePhase` (~2367) doesn't refresh the phase count in `pd-meta`; a 0:00 duration becomes 5:00 through `||300`; changing an exercise's phase in the plan editor (`changeExPhase` ~2544) doesn't re-render, so its row still names the old phase; the phone's `syncPayload` (index.html ~3015) still compares `ts>sinceTs` as text, now safe because B-24 always sends a `Z` cursor (parsing both with `Date.parse` would be belt and braces). From PR #7's notes: an "Adjust for today" override outranks a later plan edit of the set count; lowering the count to what is ticked marks the exercise done without the next-exercise banner; switching an exercise from reps to timed keeps its old `completedSets`.
 
 ## Owner notes
 
@@ -78,5 +84,10 @@ Reproduced, but smaller: `list -n 0` says "no workouts yet" and `-n -1` returns 
 - B-12 · Escape the innerHTML sites B-9 missed — https://github.com/nicklyk/GoTrain/pull/3 (v36)
 - B-13 · A malformed export crashes `import`/`sync` and leaves an orphan snapshot — https://github.com/nicklyk/omarchy-gotrain/pull/3 (1.4.1)
 - B-16 · An import that passes validation can leave the app unable to start — https://github.com/nicklyk/GoTrain/pull/4 (v36, with the id check f25bf0a that closed the `onclick` id injection)
+- B-14 · A broken config is wiped by `config set` and blanks the bar — https://github.com/nicklyk/omarchy-gotrain/pull/4 (1.4.2)
+- B-15 · A new library exercise gets a 0-second rest, or the last-edited exercise's values — https://github.com/nicklyk/GoTrain/pull/5 (v37)
+- B-17 · "Last time" shows a session where the exercise wasn't done — https://github.com/nicklyk/GoTrain/pull/6 (v37)
+- B-24 · "Latest workout" and the sync cursor are picked by sorting timestamp text — https://github.com/nicklyk/omarchy-gotrain/pull/5 (1.4.2)
+- B-25 · Changing an exercise's sets mid-workout leaves its progress wrong — https://github.com/nicklyk/GoTrain/pull/7 (v37)
 
 ## Not wanted
