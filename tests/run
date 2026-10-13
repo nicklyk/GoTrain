@@ -1190,6 +1190,78 @@ def test_a_new_library_exercise_starts_from_defaults():
     report(drive(lib, body), "new exercise defaults")
 
 
+def test_starting_new_ends_a_paused_workout():
+    print("\nstart new workout over a paused one (browser)")
+    if not browser():
+        skip("start new over paused", "no chromium found")
+        return
+    # After a reload p1 comes back paused with two Bench sets ticked. "Start
+    # new workout" used to switch plans silently: the paused session never
+    # reached History and its sets reappeared the next time p1 was started.
+    st = json.loads(json.dumps(DEMO))
+    p2 = json.loads(json.dumps(DEMO["plans"][0]))
+    p2["id"], p2["name"] = "p2", "Legs"
+    p2["exercises"] = [dict(p2["exercises"][0], id="y1", name="Squat")]
+    st["plans"].append(p2)
+    st["progress"] = {"p1": {"completedSets": {"x1": 2}, "doneExercises": [], "overrides": {}}}
+    body = """
+      const S=()=>w.eval('state'), M=()=>w.eval('workoutMode');
+      const realConfirm=w.confirm; let asked=0, answer=false;
+      w.confirm=()=>{ asked++; return answer; };
+      const startNew=()=>d.querySelector('.workout-home .btn-primary').click();
+      const pick=id=>[...d.querySelectorAll('#plan-select-list .plan-select-card')]
+        .find(c=>c.getAttribute('onclick').indexOf("'"+id+"'")>=0).click();
+      ok('it comes back paused', d.querySelector('.workout-active-banner')!==null, true);
+
+      // Cancelling changes nothing.
+      startNew(); pick('p2');
+      ok('cancel: asked once', asked, 1);
+      ok('cancel: still on the paused screen', M(), 'home');
+      ok('cancel: the active plan is unchanged', S().activePlanId, 'p1');
+      ok('cancel: the ticked sets are kept', S().progress.p1.completedSets.x1, 2);
+      ok('cancel: nothing went to history', S().history.length, 0);
+
+      // The resume banner still resumes, without asking.
+      w.closeModal('modalSelectPlan'); asked=0;
+      d.querySelector('.workout-active-banner .wab-btn').click();
+      ok('resume: no question', asked, 0);
+      ok('resume: the sets are still ticked', w.getSets('x1'), 2);
+      w.showScreen('workout'); w.eval("workoutMode='home'"); w.renderWorkout();
+
+      // Accepting saves the paused session, clears it, then starts the pick.
+      answer=true; startNew(); pick('p2');
+      ok('accept: asked once', asked, 1);
+      ok('accept: p2 is running', S().activePlanId+'/'+M(), 'p2/active');
+      ok('accept: the paused session is in history', S().history.length, 1);
+      const h=S().history[0], b=h.exercises.find(e=>e.id==='x1');
+      ok('accept: history names the paused plan', h.planId, 'p1');
+      ok('accept: with its two Bench sets', b.setsCompleted, 2);
+      ok('accept: p1 progress is cleared', JSON.stringify(S().progress.p1.completedSets), '{}');
+      ok('accept: and that was saved',
+         JSON.stringify(JSON.parse(w.localStorage.getItem('tp4_state')).progress.p1.completedSets), '{}');
+
+      // Finishing p2 adds its own entry; the paused one is not lost.
+      w.finishWorkout();
+      ok('finish: both sessions are in history', S().history.map(e=>e.planId).join(','), 'p2,p1');
+
+      // Nothing paused: the button starts a plan without asking.
+      asked=0; startNew(); pick('p1');
+      ok('fresh: no question', asked, 0);
+      ok('fresh: p1 starts at zero', w.getSets('x1'), 0);
+      ok('fresh: p1 is running', S().activePlanId+'/'+M(), 'p1/active');
+
+      // Picking the same plan from "Start new workout" starts it afresh.
+      w.completeSet('x1',1); w.clearAllTimers();
+      w.eval("workoutMode='home'"); w.renderWorkout();
+      asked=0; startNew(); pick('p1');
+      ok('same plan: asked once', asked, 1);
+      ok('same plan: starts at zero', w.getSets('x1'), 0);
+      ok('same plan: the earlier set is in history', S().history[0].exercises.find(e=>e.id==='x1').setsCompleted, 1);
+      w.confirm=realConfirm;
+    """
+    report(drive(st, body), "start new over paused")
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
@@ -1201,7 +1273,8 @@ def main():
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history,
               test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused,
-              test_a_new_library_exercise_starts_from_defaults):
+              test_a_new_library_exercise_starts_from_defaults,
+              test_starting_new_ends_a_paused_workout):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
