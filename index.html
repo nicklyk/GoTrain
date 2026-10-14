@@ -2855,8 +2855,28 @@ function closeCopySourceModal(){
 }
 function openRenamePlan(planId){ renamingPlanId=planId; document.getElementById('renamePlanInput').value=state.plans.find(p=>p.id===planId)?.name||''; openModal('modalRenamePlan'); }
 function confirmRenamePlan(){ const name=document.getElementById('renamePlanInput').value.trim(); if(name){const p=state.plans.find(p=>p.id===renamingPlanId);if(p)p.name=name;} saveState();closeModal('modalRenamePlan');renderPlanSwitcher();renderPlansList(); }
-function deletePlanModal(){ if(state.plans.length<=1){alert(t('alert.last-plan'));return;} if(!confirm(t('confirm.del-plan')))return; state.plans=state.plans.filter(p=>p.id!==renamingPlanId); if(state.activePlanId===renamingPlanId)state.activePlanId=state.plans[0].id; saveState();closeModal('modalRenamePlan');renderPlanSwitcher();renderPlansList();renderWorkout(); }
-function deletePlanById(planId){ if(state.plans.length<=1){alert(t('alert.last-plan'));return;} if(!confirm(t('confirm.del-plan')))return; state.plans=state.plans.filter(p=>p.id!==planId); if(state.activePlanId===planId)state.activePlanId=state.plans[0].id; saveState();renderPlanSwitcher();renderPlansList();renderWorkout(); }
+function deletePlanModal(){ if(removePlan(renamingPlanId)) closeModal('modalRenamePlan'); }
+function deletePlanById(planId){ removePlan(planId); }
+// The timers, the wake lock and workoutMode all belong to the active plan's
+// session, so deleting that plan has to end the session with it -- otherwise a
+// rest keeps counting for an exercise that no longer exists, and the plan that
+// inherits activePlanId is shown as the running workout. The deleted plan's
+// progress goes too: nothing can reach it again, but it would ride along in
+// tp4_state and every export. The session is not saved to History; the
+// confirm is for deleting the plan, the same way aborting discards one.
+function removePlan(planId){
+  if(state.plans.length<=1){alert(t('alert.last-plan'));return false;}
+  if(!confirm(t('confirm.del-plan')))return false;
+  state.plans=state.plans.filter(p=>p.id!==planId);
+  delete state.progress[planId];
+  if(state.activePlanId===planId){
+    state.activePlanId=state.plans[0].id;
+    clearAllTimers(); onWorkoutEnded();
+    workoutMode='home';
+  }
+  saveState();renderPlanSwitcher();renderPlansList();renderWorkout();
+  return true;
+}
 
 // ══════════════════════════════════════════════
 // EXPORT / IMPORT

@@ -1190,6 +1190,83 @@ def test_a_new_library_exercise_starts_from_defaults():
     report(drive(lib, body), "new exercise defaults")
 
 
+def test_deleting_the_running_plan_ends_the_workout():
+    print("\ndeleting the running plan (browser)")
+    if not browser():
+        skip("delete running plan", "no chromium found")
+        return
+    st = json.loads(json.dumps(DEMO))
+    p2 = json.loads(json.dumps(DEMO["plans"][0]))
+    p2["id"], p2["name"] = "p2", "Other"
+    p2["exercises"][0]["id"], p2["exercises"][1]["id"] = "y1", "y2"
+    p3 = json.loads(json.dumps(p2))
+    p3["id"], p3["name"] = "p3", "Third"
+    p3["exercises"][0]["id"], p3["exercises"][1]["id"] = "z1", "z2"
+    p4 = json.loads(json.dumps(p2))
+    p4["id"], p4["name"] = "p4", "Spare"
+    p4["exercises"][0]["id"], p4["exercises"][1]["id"] = "v1", "v2"
+    # Four plans, so three deletes never reach the last-plan guard.
+    st["plans"] += [p2, p3, p4]
+    # p3 has a paused session of its own, so deleting it shows that a plan
+    # which is not running loses its progress without touching the workout.
+    st["progress"] = {"p3": {"completedSets": {"z1": 1}, "doneExercises": [], "overrides": {}}}
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      // The wake lock functions are stubbed rather than navigator.wakeLock:
+      // the real request is async and this driver body is not.
+      let reqs=0, rels=0;
+      w.requestWakeLock=()=>{reqs++}; w.releaseWakeLock=()=>{rels++};
+      const realConfirm=w.confirm; w.confirm=()=>true;
+      const S=()=>w.eval('state');
+      const ov=()=>d.getElementById('timerOverlay').classList.contains('active');
+
+      // A plan that is not running: its progress goes, the workout stays.
+      w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1);
+      ok('ticking a set starts the rest', ov(), true);
+      w.deletePlanById('p3');
+      ok('other plan: its progress is gone', 'p3' in S().progress, false);
+      ok('other plan: the workout keeps running', w.eval('workoutMode'), 'active');
+      ok('other plan: the running plan stays active', S().activePlanId, 'p1');
+      ok('other plan: the rest keeps counting', ov(), true);
+      ok('other plan: the lock is kept', rels, 0);
+      ok('other plan: ticked sets survive', S().progress.p1.completedSets.x1, 1);
+
+      // Cancelling the confirm changes nothing.
+      w.confirm=()=>false;
+      w.deletePlanById('p1');
+      ok('cancel: the plan is still there', S().plans.some(p=>p.id==='p1'), true);
+      ok('cancel: the workout keeps running', w.eval('workoutMode'), 'active');
+      w.confirm=()=>true;
+
+      // The running plan, from the plans list.
+      w.deletePlanById('p1');
+      ok('running plan: it is gone', S().plans.some(p=>p.id==='p1'), false);
+      ok('running plan: the rest overlay closes', ov(), false);
+      ok('running plan: no timers are left', JSON.stringify(w.eval('timers')), '{"sw":{}}');
+      ok('running plan: the workout is over', w.eval('workoutMode'), 'home');
+      ok('running plan: its progress is gone', 'p1' in S().progress, false);
+      ok('running plan: and not in storage',
+         'p1' in JSON.parse(w.localStorage.getItem('tp4_state')).progress, false);
+      ok('running plan: the lock is released', rels, 1);
+      ok('running plan: the next plan is not shown as running',
+         !!d.querySelector('#workout-content .finish-workout-btn'), false);
+
+      // The running plan, from the rename dialog.
+      w.startWithPlan('p2'); w.openDetail('y1'); w.completeSet('y1',1);
+      w.openRenamePlan('p2');
+      w.deletePlanModal();
+      ok('rename dialog: the plan is gone', S().plans.some(p=>p.id==='p2'), false);
+      ok('rename dialog: the dialog closes',
+         d.getElementById('modalRenamePlan').classList.contains('active'), false);
+      ok('rename dialog: the rest overlay closes', ov(), false);
+      ok('rename dialog: the workout is over', w.eval('workoutMode'), 'home');
+      ok('rename dialog: its progress is gone', 'p2' in S().progress, false);
+      ok('rename dialog: the lock is released', rels, 2);
+      w.confirm=realConfirm;
+    """
+    report(drive(st, body), "delete running plan")
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
@@ -1201,7 +1278,8 @@ def main():
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history,
               test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused,
-              test_a_new_library_exercise_starts_from_defaults):
+              test_a_new_library_exercise_starts_from_defaults,
+              test_deleting_the_running_plan_ends_the_workout):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
