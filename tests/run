@@ -1241,6 +1241,20 @@ def test_a_new_plan_does_not_take_over_a_workout():
     """
     report(drive(DEMO, body), "new plan mid-workout")
 
+    # The harm was in History: Finish recorded the empty plan, not the session.
+    finish = """
+      const S=()=>w.eval('state');
+      w.playBeep=()=>{}; w.vibrate=()=>{}; w.confirm=()=>true;
+      w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2);
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      d.getElementById('newPlanName').value='Legs'; w.createPlan('empty');
+      w.showScreen('workout'); w.finishWorkout();
+      ok('Finish records the running plan', S().history[0].planId, 'p1');
+      ok('with the sets ticked before the new plan', S().history[0].totalSets, 2);
+      ok('and only that session', S().history.length, 1);
+    """
+    report(drive(DEMO, finish), "finish after a new plan")
+
 
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
