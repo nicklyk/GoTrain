@@ -1339,6 +1339,72 @@ def test_deleting_the_running_plan_ends_the_workout():
     report(drive(st, body), "delete running plan")
 
 
+def test_a_new_plan_does_not_take_over_a_workout():
+    print("\ncreating a plan mid-workout (browser)")
+    if not browser():
+        skip("new plan mid-workout", "no chromium found")
+        return
+    # createPlan used to make the new plan active unconditionally. With a
+    # workout running, the empty plan then showed as the running workout,
+    # Finish wrote it to History, and the real session's sets sat unseen.
+    body = """
+      const S=()=>w.eval('state');
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1);
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      w.openAddPlan(); d.getElementById('newPlanName').value='Legs';
+      w.createPlan('empty');
+      ok('the running plan stays active', S().activePlanId, 'p1');
+      ok('the new plan exists', S().plans.map(p=>p.name).join(','), 'Plan,Legs');
+      ok('the ticked set survives', S().progress.p1.completedSets.x1, 1);
+      ok('the workout is still running', w.eval('workoutMode'), 'active');
+      ok('the stored state agrees',
+         JSON.parse(w.localStorage.getItem('tp4_state')).activePlanId, 'p1');
+      ok('the name field is cleared for the next plan',
+         d.getElementById('newPlanName').value, '');
+      ok('no progress was created for the new plan',
+         Object.keys(S().progress).join(','), 'p1');
+
+      // A copy goes through the same path.
+      w.openAddPlan(); w.openCopySourceModal(); w.createPlan('copy','p1');
+      ok('a copy does not take over either', S().activePlanId, 'p1');
+      ok('the copy is named for its source', S().plans[2].name, 'Plan (Copy)');
+
+      // Paused: a reload drops to the home screen with sets still ticked.
+      // Switching then hid the resume banner and stranded the session.
+      w.eval("workoutMode='home'"); w.clearAllTimers();
+      w.createPlan('empty');
+      ok('a paused session keeps its plan active', S().activePlanId, 'p1');
+      w.showScreen('workout');
+      ok('and its resume banner is still there',
+         !!d.querySelector('.workout-active-banner'), true);
+
+      // Nothing under way: a new plan becomes active, as before.
+      S().progress.p1=w.eval('emptyProgress()');
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      d.getElementById('newPlanName').value='Arms';
+      w.createPlan('empty');
+      const arms=S().plans.find(p=>p.name==='Arms');
+      ok('with no session the new plan becomes active', S().activePlanId, arms.id);
+      ok('and the field is cleared', d.getElementById('newPlanName').value, '');
+    """
+    report(drive(DEMO, body), "new plan mid-workout")
+
+    # The harm was in History: Finish recorded the empty plan, not the session.
+    finish = """
+      const S=()=>w.eval('state');
+      w.playBeep=()=>{}; w.vibrate=()=>{}; w.confirm=()=>true;
+      w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2);
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      d.getElementById('newPlanName').value='Legs'; w.createPlan('empty');
+      w.showScreen('workout'); w.finishWorkout();
+      ok('Finish records the running plan', S().history[0].planId, 'p1');
+      ok('with the sets ticked before the new plan', S().history[0].totalSets, 2);
+      ok('and only that session', S().history.length, 1);
+    """
+    report(drive(DEMO, finish), "finish after a new plan")
+
+
 
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list

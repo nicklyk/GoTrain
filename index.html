@@ -2841,12 +2841,22 @@ function createPlan(mode, sourcePlanId){
   }
 
   state.plans.push({id:newId,name:finalName,phases,exercises});
-  state.activePlanId=newId;
+  // A new plan only becomes the active one when no session is under way.
+  // Switching while one runs (or sits paused with sets ticked) showed the
+  // empty plan as the running workout, Finish wrote it to History, and the
+  // real session's sets were left in state.progress where nothing showed them.
+  // Read directly: getProg would create an entry, and with no plans yet there
+  // is no active id to create one under.
+  const prog=state.progress[state.activePlanId];
+  const inSession=hasPlan()&&(workoutMode==='active'||!!prog&&(prog.doneExercises.length>0||Object.values(prog.completedSets).some(v=>v>0)));
+  if(!inSession) state.activePlanId=newId;
   saveState();
+  // The field kept its text, so the next plan was silently given the same name.
+  document.getElementById('newPlanName').value='';
   closeModal('modalAddPlan');
   closeModal('modalCopySource');
   renderPlansList();
-  renderWorkout();
+  if(!inSession) renderWorkout();
 }
 
 function openAddPlan(){
