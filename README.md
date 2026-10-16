@@ -19,6 +19,11 @@ unless you choose to move it.
 - **Reps or time** — sets and reps, or a countdown for timed exercises
 - **Live tracking** — tick off sets, rest timer between sets that you can
   lengthen or shorten while it runs, stopwatch per set
+- **Timers that survive a locked phone** — every timer runs off the clock, so
+  locking the screen or switching apps never loses time; come back and it has
+  caught up. The screen stays on during a workout where the browser allows it
+- **Duration wheel** — rest and exercise times are set on a minutes/seconds
+  scroll wheel
 - **Last time** — each exercise shows what you lifted in the previous session,
   and flags it when today's weight would be a new best
 - **History** — every finished session is saved with its full exercise detail
@@ -118,7 +123,9 @@ the app from. It is never uploaded — there is nowhere to upload it *to*.
 That has two consequences worth understanding:
 
 - **Clearing site data deletes your history.** Use **Settings → Data → Export**
-  to keep a backup, and **Import** to restore it.
+  to keep a backup, and **Import** to restore it. Import refuses a file that is
+  damaged or malformed, and asks before replacing your history with a shorter
+  one.
 - **Hosting a copy gives you no access to anyone's data**, including your own on
   another device. Each origin, browser and device is a separate store.
 
@@ -149,6 +156,16 @@ It is deliberately one file of plain HTML, CSS and JavaScript with no framework
 and no build step, so it stays readable and will still run in ten years. The
 only bundled dependency is a QR decoder, inlined so the app keeps working
 offline.
+
+To check a change, run the tests:
+
+```bash
+./tests/run
+```
+
+They need only Python 3. Static checks always run (translations, version
+markers, service-worker assets, syntax); the behavioural tests drive the real
+app in headless Chromium and are skipped if no Chromium is installed.
 
 ## Licence
 
