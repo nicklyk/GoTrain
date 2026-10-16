@@ -874,6 +874,7 @@ const T = {
     'workout.active.banner.title':'TRAINING LÄUFT',
     'workout.active.resume':'FORTSETZEN','workout.finish':'TRAINING ABSCHLIESSEN',
     'workout.end.confirm':'Training wirklich beenden? Der Fortschritt wird im Verlauf gespeichert.',
+    'workout.end.paused.confirm':'Das pausierte Training beenden? Es wird im Verlauf gespeichert.',
     'workout.end.new':'Neues Training starten',
     'workout.abort':'Training abbrechen','workout.abort.confirm':'Training wirklich abbrechen? Fortschritt geht verloren.',
     'next.exercise':'Nächste Übung',
@@ -967,6 +968,7 @@ const T = {
     'workout.active.banner.title':'WORKOUT IN PROGRESS',
     'workout.active.resume':'RESUME','workout.finish':'FINISH WORKOUT',
     'workout.end.confirm':'Really finish workout? Progress will be saved to history.',
+    'workout.end.paused.confirm':'End the paused workout? It will be saved to history.',
     'workout.end.new':'Start new workout',
     'workout.abort':'Abort workout','workout.abort.confirm':'Really abort workout? Progress will be lost.',
     'next.exercise':'Next exercise',
@@ -1642,6 +1644,24 @@ function startWithPlan(planId){
   updateProgress();
 }
 
+// "Start new workout" on a paused session. It used to switch plans without a
+// word: the paused sets never reached History, and stayed in state.progress to
+// reappear ticked the next time that plan was started. Ending it here follows
+// newWorkout's rule -- ask, then save what was done, then clear it. The resume
+// banner still goes straight to startWithPlan.
+function startNewWithPlan(planId){
+  const pausedId=state.activePlanId, prog=getProg(pausedId);
+  const hasProgress=prog.doneExercises.length>0||Object.values(prog.completedSets).some(v=>v>0);
+  if(workoutMode==='home' && hasProgress){
+    if(!confirm(t('workout.end.paused.confirm'))) return;
+    saveHistory();
+    state.progress[pausedId]=emptyProgress();
+    saveState();
+    clearAllTimers();
+  }
+  startWithPlan(planId);
+}
+
 function finishWorkout(){
   if(!confirm(t('workout.end.confirm'))) return;
   saveHistory();
@@ -1664,7 +1684,7 @@ function openPlanSelectModal(){
     const done = prog.doneExercises.length, total = p.exercises.length;
     const pct = total ? Math.round(done/total*100) : 0;
     const isCurrentActive = workoutMode==='active' && p.id===state.activePlanId;
-    return `<div class="plan-select-card ${isCurrentActive?'selected':''}" onclick="startWithPlan('${p.id}')">
+    return `<div class="plan-select-card ${isCurrentActive?'selected':''}" onclick="startNewWithPlan('${p.id}')">
       <div class="psc-name">${isCurrentActive?'▶ ':''} ${escHtml(p.name)}</div>
       <div class="psc-meta">${p.phases.length} ${t('phases')} · ${total} ${t('exercises')}${hasProgress?' · '+pct+'% '+t('done').replace('✓ ',''):''}</div>
     </div>`;
