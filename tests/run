@@ -1190,6 +1190,57 @@ def test_a_new_library_exercise_starts_from_defaults():
     report(drive(lib, body), "new exercise defaults")
 
 
+def test_ending_a_workout_leaves_no_timers_behind():
+    print("\nreset and new workout clear timers (browser)")
+    if not browser():
+        skip("reset clears timers", "no chromium found")
+        return
+    # The rest timer lives in its own key, tp4_timers, so that it survives a
+    # reload. "Delete all data" used to remove only tp4_state, and the empty
+    # app came back with the old rest still counting over it. "New workout"
+    # cleared the timers but kept the screen awake.
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      let held=0;
+      w.requestWakeLock=()=>{ held++; };
+      w.releaseWakeLock=()=>{ held--; };
+      const up=()=>d.getElementById('timerOverlay').classList.contains('active');
+      const stored=()=>JSON.parse(w.localStorage.getItem('tp4_timers')||'null');
+
+      w.startWithPlan('p1'); w.openDetail('x1'); w.startPauseTimer(75);
+      ok('the workout holds the wake lock', held, 1);
+      w.confirm=()=>false; w.newWorkout();
+      ok('a cancelled new workout keeps the rest', up(), true);
+      ok('a cancelled new workout keeps the wake lock', held, 1);
+      w.confirm=()=>true; w.newWorkout();
+      ok('a new workout closes the rest', up(), false);
+      ok('a new workout leaves no rest stored', (stored()||{}).rest||null, null);
+      ok('a new workout releases the wake lock', held, 0);
+
+      w.startWithPlan('p1'); w.openDetail('x1'); w.startPauseTimer(75);
+      w.confirm=()=>false; w.confirmResetAll();
+      ok('a cancelled reset keeps the data', w.localStorage.getItem('tp4_state')!==null, true);
+      ok('a cancelled reset keeps the rest', stored().rest!==null, true);
+      w.confirm=()=>true; w.confirmResetAll();
+      ok('reset removes the state', w.localStorage.getItem('tp4_state'), null);
+      ok('reset removes the timers', w.localStorage.getItem('tp4_timers'), null);
+      // confirmResetAll reloads the frame; look again once it is back.
+      setTimeout(()=>{
+        try{
+          const w2=f.contentWindow, d2=f.contentDocument;
+          ok('after the reset the app is up', !!d2.getElementById('timerOverlay'), true);
+          ok('after the reset no rest overlay shows', d2.getElementById('timerOverlay').classList.contains('active'), false);
+          ok('after the reset no rest is running', w2.eval('timers.rest')||null, null);
+        }catch(e){ out.push('FAIL|reload check threw|'+e.message+'|-'); }
+        document.title=out.join('~');
+      }, 2500);
+    """
+    results = drive(DEMO, body)
+    report(results, "reset clears timers")
+    check("reset clears timers: the reloaded app was inspected",
+          any("after the reset the app is up" in r for r in results), True)
+
+
 def main():
     for t in (test_translations, test_version_markers, test_service_worker_assets,
               test_manifest, test_syntax_and_licence,
@@ -1201,7 +1252,8 @@ def main():
               test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
               test_import_of_an_old_export, test_import_asks_before_shrinking_history,
               test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused,
-              test_a_new_library_exercise_starts_from_defaults):
+              test_a_new_library_exercise_starts_from_defaults,
+              test_ending_a_workout_leaves_no_timers_behind):
         t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
