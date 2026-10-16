@@ -1191,18 +1191,11 @@ def test_a_new_library_exercise_starts_from_defaults():
 
 
 def main():
-    for t in (test_translations, test_version_markers, test_service_worker_assets,
-              test_manifest, test_syntax_and_licence,
-              test_timers_survive_a_locked_screen, test_duration_migration,
-              test_quoted_text_survives_editing, test_stranded_data_is_repaired, test_deleting_an_exercise_clears_its_progress,
-              test_adjusting_keeps_a_hand_completed_exercise_done, test_changing_sets_keeps_progress_consistent,
-              test_last_time_is_shown, test_a_personal_best_is_marked,
-              test_a_skipped_exercise_is_not_last_time,
-              test_rest_can_be_adjusted_while_running, test_the_library_can_be_filtered, test_the_set_heading_matches_the_exercise, test_user_text_cannot_inject_markup, test_imported_fields_cannot_inject_markup,
-              test_import_of_an_old_export, test_import_asks_before_shrinking_history,
-              test_a_misshapen_import_is_refused, test_an_import_with_unsafe_ids_is_refused,
-              test_a_new_library_exercise_starts_from_defaults):
-        t()
+    # Every test_* function runs, in the order it is defined. A hand-kept list
+    # here made every new test a merge conflict and could silently skip one.
+    for name, t in list(globals().items()):
+        if name.startswith("test_") and callable(t):
+            t()
     print(f"\n{passed} passed, {len(failures)} failed, {skipped} skipped")
     if failures:
         print("\nfailures:")
