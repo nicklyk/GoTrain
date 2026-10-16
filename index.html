@@ -3172,10 +3172,19 @@ function newWorkout(){
   const hasProgress=prog.doneExercises.length>0||Object.values(prog.completedSets).some(v=>v>0);
   if(hasProgress) saveHistory();
   state.progress[state.activePlanId]=emptyProgress();
-  saveState();clearAllTimers();
+  saveState();clearAllTimers();onWorkoutEnded();
   workoutMode='home'; showScreen('workout');appScroll().scrollTo(0,0);
 }
-function confirmResetAll(){ if(!confirm(t('confirm.reset-all')))return; localStorage.removeItem('tp4_state');location.reload(); }
+// The timers live in their own key so a rest survives a reload -- which is
+// exactly why removing only tp4_state brought the old rest back, counting
+// over the empty app. clearAllTimers first stops the ticker, so nothing
+// writes the key again between here and the reload.
+function confirmResetAll(){
+  if(!confirm(t('confirm.reset-all')))return;
+  clearAllTimers();
+  localStorage.removeItem('tp4_state'); localStorage.removeItem(TIMERS_KEY);
+  location.reload();
+}
 
 // ══════════════════════════════════════════════
 // HISTORY
