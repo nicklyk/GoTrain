@@ -1,72 +1,63 @@
 # Backlog
 
-Updated 2026-10-16 by the scout. Edit freely: reorder lines, delete what you don't
+Updated 2026-10-19 by the scout. Edit freely: reorder lines, delete what you don't
 want, add notes. The nightly build takes the highest item without an open PR.
 
 ## Top ten
 
-1. **B-32 · omarchy-gotrain · `records`, `progress` and import PRs count exercises that were skipped**
-   Why: the phone writes a history row for every exercise in the plan, skipped ones included (`setsCompleted: 0, done: false`, with the plan's kg). `load_series` (~749) reads `e.kg` from every row and never looks at `done` or `sets_completed`, so a skipped exercise becomes a session at the plan's load. That's the desktop half of B-17, which was fixed only in the PWA. Reproduced against a throwaway archive: Bench 57.5 kg done on 10 Sep, then a workout on 20 Sep with Bench planned at 80 kg and skipped → `records` says "Bench 80kg set 2026-09-20", `progress Bench` shows +22.5 over 2 sessions, and the import's PR diff (~522/644) would put "PR: Bench 80kg" in the desktop notification. `stats` already filters on `done = 1`, so the commands disagree with each other. Use the PWA's `rowWasDone` rule: a row counts if `done` or `sets_completed > 0`. A legacy row with neither field still counts, judged from the stored `json`, because `done` is stored as 0 when the field is missing.
-   Verify: new test with that two-workout fixture: `records` gives 57.5 kg on 2026-09-10, `progress Bench` lists 1 session, and importing the skipped workout on top of the first reports no PR. A legacy row without `setsCompleted`/`done` still appears in `records`.
-   Size: small
-
-
-2. **B-18 · omarchy-gotrain · `sync` and the panel's "N waiting" count still disagree**
+1. **B-18 · omarchy-gotrain · `sync` and the panel's "N waiting" count still disagree**
    Why: B-8 made `pending` count only un-imported files, but `sync` without `--all` still imports only `found[:1]` (~1064), the newest file, even when it is already imported or unreadable. Reproduced: an older un-imported export plus a newer already-imported one → `sync` says "already imported, nothing to do", panel keeps `pending 1` forever. Add a newest `{"broken` file → `pending 2`, `sync` exits 1 "nothing could be imported". Invalid JSON is counted although the docstring says unreadable files aren't. Keep B-4's concern in mind (an older export must not restore an older library): the simplest fix is making `pending` report what `sync` would do.
    Verify: new test with that two-file scenario: after `sync`, `pending` is 0 or equals what `sync` would import next; a broken newest file is not counted and does not block a valid one.
    Size: small
 
-
-3. **B-27 · GoTrain · A single history entry cannot be deleted**
+2. **B-27 · GoTrain · A single history entry cannot be deleted**
     Why: there is no path that removes one entry from `state.history` (`renderHistory`/`openHistoryDetail` ~3228-3260 offer none; the only way out is "Delete all data"). A workout finished by mistake -- including the empty one `finishWorkout` writes when nothing was done -- stays in History for good and feeds "Last time" and New best. A delete button on the history detail screen, behind a `confirm`, removing that one entry by id. Caveat for the PR text: the desktop archive merges and never deletes, so a later restore from `gotrain export` brings the entry back; the PR should say so, not try to fix it.
     Verify: browser test: two entries, delete one from its detail screen → `state.history` holds only the other (persisted in `tp4_state`), the list re-renders, other entries untouched; cancelling the confirm changes nothing. New keys in both `T.de` and `T.en`.
     Size: small
 
-
-4. **B-26 · GoTrain · Starting one timed exercise's countdown wipes another's paused countdown**
+3. **B-26 · GoTrain · Starting one timed exercise's countdown wipes another's paused countdown**
    Why: there is a single `timers.ex` slot (`etRecord`/`etToggle` ~2221), so starting any timed exercise overwrites the held countdown of the previous one. Reproduced in headless Chromium: start Row (8:00), let it reach 6:20, go back, start Plank, go back to Row → it shows 8:00 and the 100 s are lost. Natural in a circuit or when two timed exercises share a phase.
    Verify: browser test with those steps: Row reopens at 6:20 (±1 s) and Plank keeps its own state. Key the record by exercise id like `timers.sw`, and still read the old single-slot shape from an existing `tp4_timers` after the update.
    Size: small
 
-
-5. **B-29 · GoTrain · The rest overlay forgets which set it is resting for**
+4. **B-29 · GoTrain · The rest overlay forgets which set it is resting for**
     Why: `timers.rest` (`startPauseTimer` ~2178) stores only `{endAt,total}`; the "Set n/m" line is written once into `#tovNext` by `completeSet` (~2051) and never again. So when the rest is restored after a reload, or after iOS kills the PWA while you rest (the common case on the owner's phone), the overlay counts down with an empty line under it (reproduced by an earlier scout run; the code is unchanged in v38). The same one-shot write is why the overlay keeps saying "Set 3/3" after the set count is lowered while a rest runs (left open in PR #7's notes). Store `exId` and the next set number in `timers.rest` and render the line from it in `renderRestTimer`; an old `tp4_timers` without them shows no line, as today, rather than throwing.
     Verify: browser test: tick set 1 of 3, reload with the rest running → overlay reads "Set 2/3"; a stored `{endAt,total}` record from before the change still restores and counts with no line and no error.
     Size: small
 
-
-6. **B-31 · GoTrain · Switching language mid-workout puts the workout header on the Settings screen**
+5. **B-31 · GoTrain · Switching language mid-workout puts the workout header on the Settings screen**
    Why: `changeLang` (~1319) calls `renderWorkout()` unconditionally, and with `workoutMode==='active'` that ends in `setWorkoutHeader`, even though the user is on Settings, where the language select lives. Reproduced in headless Chromium (DEMO, v37; `changeLang` unchanged in v38): start the plan → Settings (header correctly reads "GOTRAIN", empty sub-line) → switch to Deutsch → header reads "PLAN" / "🟢 TRAINING LÄUFT" while `screen-settings` is still the active screen. It stays until the user changes tab. Only re-render the workout when its screen is active, the way the two Settings tabs below it are already guarded. PR #10 (B-22) already closed the same symptom through `createPlan`; this is the remaining path.
    Verify: browser test: start a plan, `showScreen('settings')`, `changeLang('de')` → `#h-plan-name` is "GOTRAIN" and `#h-sub` empty; going back to the Workout tab shows the German running-workout header; switching language on the Workout tab still updates it in place.
    Size: small
 
-
-7. **B-21 · omarchy-gotrain · `progress NAME` misses non-ASCII names and blames the archive**
+6. **B-21 · omarchy-gotrain · `progress NAME` misses non-ASCII names and blames the archive**
    Why: the name match uses SQLite `lower()` (~756), which folds ASCII only, so `progress überkopfdrücken` misses "Überkopfdrücken" — the owner's German exercise names are exactly where this bites. Any miss, a plain typo included ("Bench Pres", reproduced), says "no load data yet -- import a workout that has one", which is wrong with a full archive.
-   Verify: new test: `progress überkopfdrücken` finds "Überkopfdrücken" (match with Python `casefold()` instead of SQL `lower()`); a name with no match says no exercise by that name was found, and suggests the closest names (`difflib`, stdlib) rather than blaming the archive.
+   Verify: new test: `progress überkopfdrücken` finds "Überkopfdrücken" (match with Python `casefold()` instead of SQL `lower()`); a name with no match says no exercise by that name was found, and suggests the closest names (`difflib`, stdlib) rather than blaming the archive. Open PR #6 (B-32) also edits `load_series`; build on top of it or expect a small merge.
    Size: small
 
-
-8. **B-23 · omarchy-gotrain · Piping `list`, `stats` or `export` into `head` ends in a traceback**
+7. **B-23 · omarchy-gotrain · Piping `list`, `stats` or `export` into `head` ends in a traceback**
    Why: closing stdout early raises `BrokenPipeError` out of `main`, so `gotrain list | head` and `gotrain export | head -c 100` print a Python traceback (reproduced on a 3000-workout archive). Ordinary shell use, and the traceback reads like archive damage.
    Verify: new test pipes `list`, `stats` and `export` into a reader that closes after one line: exit status is not a traceback, stderr has no `Traceback`. Catch it in `main` and point stdout at `os.devnull`; no `SIG_DFL` around archive writes, so an interrupted import still rolls back.
    Size: small
 
-
-9. **B-30 · GoTrain · The plan editor shows stale labels after a phase is changed or deleted**
+8. **B-30 · GoTrain · The plan editor shows stale labels after a phase is changed or deleted**
    Why: `changeExPhase` (~2564) saves the new `phaseId` but never re-renders, so the exercise row's meta line keeps naming the old phase. Reproduced in headless Chromium (DEMO plus a second phase "Finisher"): pick Finisher in Bench's phase select → `state` holds `p2`, the row still reads "Chest · S · 8 reps · 3 Sets · 60 kg". Same screen: `deletePhase` (~2387) re-renders the phase list but not `pd-meta`, so the header keeps the old phase count, while adding a phase (~2385) does update it. Small, but it makes the editor look as if the change did not take.
    Verify: browser test: change Bench's phase via the select → its `.plan-ex-meta` names the new phase and the select keeps it; delete a phase → `pd-meta` shows one phase fewer. Re-rendering must not lose the scroll position of a long list more than other editor actions already do.
    Size: small
 
-
-10. **B-33 · GoTrain · An export made after midnight is named for the day before**
+9. **B-33 · GoTrain · An export made after midnight is named for the day before**
    Why: `exportFilename` (~2928) takes the date from `toISOString()`, which is UTC. In Germany that is every export between 00:00 and 01:00 (winter) or 02:00 (summer): reproduced with `TZ=Europe/Berlin` at 00:30 CEST on 16 Oct → `gotrain-2026-10-15.json`. The file then looks like yesterday's backup next to the real one. The history entry's own `date` is already local (`saveHistory` ~3218); only the filename disagrees. Build the date from `getFullYear/getMonth/getDate`.
    Verify: browser test with Chromium started under `TZ=Europe/Berlin` (or with `Date` stubbed to 2026-10-16T00:30+02:00): the name is `gotrain-2026-10-16.json`; a midday export is unchanged.
    Size: small
 
+10. **B-34 · omarchy-gotrain · `stats` prints its first/last dates in UTC, so it disagrees with `list`**
+   Why: `cmd_stats` (~1430) prints `span['a'][:10]`, the first ten characters of the stored text, which for app workouts is the UTC date. B-6 moved every other day to local time, so the commands now contradict each other. Reproduced tonight with `TZ=Europe/Berlin` and two workouts at 00:30 and 00:40 local (`ts` 22:30Z/22:40Z the day before): `list` shows 2026-10-02 and 2026-10-16, `stats` says "first / last : 2026-10-01 .. 2026-10-15". Every late-evening-into-midnight session is off by one. Use `local_date()` as `today` and `list` already do; a row whose `ts` cannot be parsed keeps today's fallback.
+   Verify: new test with that fixture under `TZ=Europe/Berlin`: `stats` prints `2026-10-02 .. 2026-10-16`, matching `list`; a midday workout's date is unchanged; a legacy `+02:00` timestamp gives its own local date.
+   Size: small
+
 ## Candidates that did not make the ten
 
-Reproduced, but smaller: `list -n 0` says "no workouts yet" and `-n -1` returns everything (`LIMIT -1`); finishing a workout with nothing done still writes a history entry (`finishWorkout` ~1665 lacks `newWorkout`'s `hasProgress` guard — owner's call); `stats` prints first/last dates in UTC; `export --csv -o` miscounts rows when a name contains a newline, and `durationSecs: true` exports as a number. Read in code only: `BarWidget.qml:36` may leave `%25`/`%23` in the CLI path, and `Panel.qml:248` quotes path and argument as one string; README lists `origin` as a config key but `load_config` always overwrites it; `doctor` shows the total pending count on every watch-folder row and assumes a /24; `import a b` stops at the first bad file after committing the earlier ones; German confirms spelled `zuruecksetzen`/`loeschen` (index.html ~854-855); a 0:00 duration becomes 5:00 through `||300`; the phone's `syncPayload` (index.html ~3065) still compares `ts>sinceTs` as text, now safe because B-24 always sends a `Z` cursor (parsing both with `Date.parse` would be belt and braces). From PR #7's notes: an "Adjust for today" override outranks a later plan edit of the set count; lowering the count to what is ticked marks the exercise done without the next-exercise banner; switching an exercise from reps to timed keeps its old `completedSets`. From PR #8's notes: progress an older build already left behind in a non-active plan through B-28's bug still opens ticked; only the paused plan is ended. From PR #9's notes: deleting the running plan discards its session rather than saving it to History, and the delete confirm doesn't mention a running workout. From PR #10's notes: a plan created mid-workout gives no sign that it did not become active. From the v38 merge notes: every PR appends to `tests/run`'s test list; 20c2523 removed that conflict by discovering `test_*` functions. Read in code only: `switchPlan` (index.html ~1542) has no caller left and could go; B-32 and B-21 both touch `load_series`, so whichever is built second needs a small merge.
+Reproduced, but smaller: `list -n 0` says "no workouts yet" and `-n -1` returns everything (`LIMIT -1`); finishing a workout with nothing done still writes a history entry (`finishWorkout` ~1665 lacks `newWorkout`'s `hasProgress` guard — owner's call); `export --csv -o` miscounts rows when a name contains a newline, and `durationSecs: true` exports as a number. Read in code only: `BarWidget.qml:36` may leave `%25`/`%23` in the CLI path, and `Panel.qml:248` quotes path and argument as one string; README lists `origin` as a config key but `load_config` always overwrites it; `doctor` shows the total pending count on every watch-folder row and assumes a /24; `import a b` stops at the first bad file after committing the earlier ones; German confirms spelled `zuruecksetzen`/`loeschen` (index.html ~854-855); a 0:00 duration becomes 5:00 through `||300`; the phone's `syncPayload` (index.html ~3065) still compares `ts>sinceTs` as text, now safe because B-24 always sends a `Z` cursor (parsing both with `Date.parse` would be belt and braces). From PR #7's notes: an "Adjust for today" override outranks a later plan edit of the set count; lowering the count to what is ticked marks the exercise done without the next-exercise banner; switching an exercise from reps to timed keeps its old `completedSets`. From PR #8's notes: progress an older build already left behind in a non-active plan through B-28's bug still opens ticked; only the paused plan is ended. From PR #9's notes: deleting the running plan discards its session rather than saving it to History, and the delete confirm doesn't mention a running workout. From PR #10's notes: a plan created mid-workout gives no sign that it did not become active. Read in code only: `switchPlan` (index.html ~1542) has no caller left and could go; From omarchy PR #6's notes (B-32): `stats` and the panel's muscle sets still filter `done = 1`, so they drop the legacy rows that `records`/`progress` now count. Reproduced tonight: `list -n 0` still says "no workouts yet" and `list -n -1` returns everything; `stats | head` still ends in a traceback (B-23).
 
 ## Owner notes
 
