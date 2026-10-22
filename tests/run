@@ -1526,6 +1526,28 @@ def test_one_history_entry_can_be_deleted():
     """
     report(drive(dup, body2), "delete history entry with empty ids")
 
+    # The point of deleting: a mistaken newest entry stops feeding "Last time"
+    # and the personal best. Deleting the middle entry above cannot show this,
+    # because the newest one answers "Last time" either way.
+    wrong = _with_history([_session("s3", "2026-09-19T18:00:00Z", "100"),
+                           _session("s2", "2026-09-12T18:00:00Z", "60"),
+                           _session("s1", "2026-09-05T18:00:00Z", "55")])
+    wrong["plans"][0]["exercises"][0]["kg"] = "62"
+    body3 = """
+      w.confirm=()=>true;
+      w.startWithPlan('p1'); w.openDetail('x1');
+      let txt=d.getElementById('d-last').textContent;
+      ok('before: the mistaken entry is last time', txt.indexOf('100 kg') >= 0, true);
+      ok('before: and hides the new best', txt.indexOf('★'), -1);
+      w.openHistoryDetail('s3'); d.getElementById('hd-delete').click();
+      w.startWithPlan('p1'); w.openDetail('x1');
+      txt=d.getElementById('d-last').textContent;
+      ok('after: last time is the newest entry left', txt.indexOf('60 kg') >= 0, true);
+      ok('after: the mistaken weight is gone', txt.indexOf('100 kg'), -1);
+      ok('after: 62 kg is a new best again', txt.indexOf('★') >= 0, true);
+    """
+    report(drive(wrong, body3), "delete history entry feeds last time")
+
 
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
