@@ -1457,6 +1457,76 @@ def test_ending_a_workout_leaves_no_timers_behind():
 
 
 
+def test_one_history_entry_can_be_deleted():
+    print("\ndeleting one history entry (browser)")
+    if not browser():
+        skip("delete history entry", "no chromium found")
+        return
+    st = _with_history([_session("s3", "2026-09-19T18:00:00Z", "65"),
+                        _session("s2", "2026-09-12T18:00:00Z", "60"),
+                        _session("s1", "2026-09-05T18:00:00Z", "55")])
+    body = """
+      const S=()=>w.eval('state');
+      const stored=()=>JSON.parse(w.localStorage.getItem('tp4_state')).history.map(e=>e.id).join(',');
+      const realConfirm=w.confirm;
+      w.showScreen('history');
+      ok('three entries are listed', d.querySelectorAll('#history-content .h-card').length, 3);
+      w.openHistoryDetail('s2');
+      const btn=d.getElementById('hd-delete');
+      ok('the detail screen offers a delete button', btn.textContent, 'Delete this workout');
+
+      // Cancelling the confirm changes nothing.
+      w.confirm=()=>false;
+      btn.click();
+      ok('cancel: all entries are kept', S().history.map(e=>e.id).join(','), 's3,s2,s1');
+      ok('cancel: the detail screen stays open',
+         d.getElementById('screen-history-detail').classList.contains('active'), true);
+
+      w.confirm=()=>true;
+      btn.click();
+      ok('only the open entry is gone', S().history.map(e=>e.id).join(','), 's3,s1');
+      ok('and not in storage either', stored(), 's3,s1');
+      ok('the others are untouched',
+         JSON.stringify(S().history.map(e=>e.exercises[0].kg)), '["65","55"]');
+      ok('the history list is shown again',
+         d.getElementById('screen-history').classList.contains('active'), true);
+      ok('the list is re-rendered without it',
+         d.querySelectorAll('#history-content .h-card').length, 2);
+
+      // "Last time" now reads the session before it.
+      w.startWithPlan('p1'); w.openDetail('x1');
+      ok('last time still finds the newest remaining session',
+         d.getElementById('d-last').textContent.indexOf('65 kg') >= 0, true);
+
+      // The last one leaves the empty state, not a broken screen.
+      w.openHistoryDetail('s3'); d.getElementById('hd-delete').click();
+      w.openHistoryDetail('s1'); d.getElementById('hd-delete').click();
+      ok('the history can be emptied one by one', S().history.length, 0);
+      ok('the empty state is shown',
+         !!d.querySelector('#history-content .empty-state'), true);
+
+      // German label.
+      w.changeLang('de');
+      ok('the button is translated',
+         d.getElementById('hd-delete').textContent, 'Dieses Training löschen');
+      w.confirm=realConfirm;
+    """
+    report(drive(st, body), "delete history entry")
+
+    # Older exports may carry empty ids, which idsLookSafe allows. Deleting one
+    # such entry must not take the others that share the empty id.
+    dup = _with_history([_session("", "2026-09-12T18:00:00Z", "60"),
+                         _session("", "2026-09-05T18:00:00Z", "55")])
+    body2 = """
+      w.confirm=()=>true;
+      w.openHistoryDetail(''); d.getElementById('hd-delete').click();
+      const h=w.eval('state').history;
+      ok('a shared empty id: exactly one entry is deleted', h.length, 1);
+      ok('a shared empty id: it is the one that was open', h[0].exercises[0].kg, '55');
+    """
+    report(drive(dup, body2), "delete history entry with empty ids")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
