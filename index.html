@@ -556,6 +556,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
   <div class="info-grid" id="hd-info"></div>
   <div class="sec-label" id="hd-ex-label"></div>
   <div id="hd-exercises"></div>
+  <button class="btn-danger" id="hd-delete" style="margin-top:24px" onclick="deleteHistoryEntry()" data-i="history.delete"></button>
 </div>
 
 </div><!-- /#app-scroll -->
@@ -871,6 +872,8 @@ const T = {
     'workout.home.title.active':'TRAINING PAUSIERT','workout.home.sub.active':'Du hast ein Training begonnen. Möchtest du weitermachen?',
     'workout.start':'TRAINING STARTEN','workout.select.title':'PLAN AUSWÄHLEN','workout.select.sub':'Mit welchem Plan möchtest du trainieren?',
     'history.detail.exercises':'ÜBUNGEN','history.detail.plan':'Plan',
+    'history.delete':'Dieses Training löschen',
+    'confirm.history-delete':'Dieses Training aus dem Verlauf löschen? Das lässt sich nicht rückgängig machen.',
     'workout.active.banner.title':'TRAINING LÄUFT',
     'workout.active.resume':'FORTSETZEN','workout.finish':'TRAINING ABSCHLIESSEN',
     'workout.end.confirm':'Training wirklich beenden? Der Fortschritt wird im Verlauf gespeichert.',
@@ -965,6 +968,8 @@ const T = {
     'workout.home.title.active':'WORKOUT PAUSED','workout.home.sub.active':'You have a workout in progress. Want to continue?',
     'workout.start':'START WORKOUT','workout.select.title':'SELECT PLAN','workout.select.sub':'Which plan do you want to train with?',
     'history.detail.exercises':'EXERCISES','history.detail.plan':'Plan',
+    'history.delete':'Delete this workout',
+    'confirm.history-delete':'Delete this workout from your history? This cannot be undone.',
     'workout.active.banner.title':'WORKOUT IN PROGRESS',
     'workout.active.resume':'RESUME','workout.finish':'FINISH WORKOUT',
     'workout.end.confirm':'Really finish workout? Progress will be saved to history.',
@@ -3245,8 +3250,10 @@ function renderHistory(){
   cont.innerHTML=h;
 }
 
+let openHistoryEntry=null;
 function openHistoryDetail(entryId){
   const entry=state.history.find(e=>e.id===entryId); if(!entry) return;
+  openHistoryEntry=entry;
   document.getElementById('hd-title').textContent=entry.plan.toUpperCase();
   document.getElementById('hd-sub').textContent=entryDate(entry)+' · '+entryTime(entry);
   // Info boxes
@@ -3269,6 +3276,18 @@ function openHistoryDetail(entryId){
   }).join('');
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-history-detail').classList.add('active');
+}
+
+// Removes the entry on screen by identity, not by id: an imported history may
+// carry empty or repeated ids (idsLookSafe allows '' for older exports), and
+// filtering on one would take every entry sharing it.
+function deleteHistoryEntry(){
+  const i=state.history.indexOf(openHistoryEntry);
+  if(i<0||!confirm(t('confirm.history-delete')))return;
+  state.history.splice(i,1);
+  openHistoryEntry=null;
+  saveState();
+  showScreen('history');
 }
 
 // ══════════════════════════════════════════════
