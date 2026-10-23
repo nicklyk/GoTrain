@@ -2154,13 +2154,24 @@ function loadTimers(){
 function saveTimers(){ try{ localStorage.setItem(TIMERS_KEY, JSON.stringify(timers)); }catch(e){} }
 let timers=loadTimers();
 if(!timers.sw||typeof timers.sw!=='object') timers.sw={};
+// Timed exercises used to share one countdown slot, timers.ex, so starting a
+// second one threw away the time held on the first. They are now kept per
+// exercise in timers.et, like the stopwatches. A tp4_timers saved by an older
+// build still has the single slot: move it across once, without overwriting a
+// record the new shape already holds, so running this again changes nothing.
+if(timers.ex&&typeof timers.ex==='object'&&timers.ex.exId){
+  const {exId,...rec}=timers.ex;
+  if(!timers.et||typeof timers.et!=='object') timers.et={};
+  if(!timers.et[exId]) timers.et[exId]=rec;
+}
+if('ex' in timers){ delete timers.ex; saveTimers(); }
 
 // One ticker drives every display. 250ms rather than 1000ms so the seconds
 // turn over crisply and a resume redraws almost immediately.
 let tickInt=null;
 function timersRunning(){
   if(timers.rest) return true;
-  if(timers.ex&&timers.ex.endAt) return true;
+  if(Object.values(timers.et||{}).some(e=>e&&e.endAt)) return true;
   return Object.keys(timers.sw).some(k=>timers.sw[k]&&timers.sw[k].startedAt);
 }
 function startTicker(){ if(!tickInt) tickInt=setInterval(tickAll,250); }
@@ -2218,26 +2229,33 @@ function renderRestTimer(){
 }
 
 // ── a timed exercise's countdown ───────────────────────────────────────
-function etRecord(){ const e=timers.ex; return (e&&e.exId===currentExId)?e:null; }
+// Created on first write only, so a session that never starts a countdown
+// leaves tp4_timers in the same {sw:{}} shape clearAllTimers writes.
+function etRecord(){ return (timers.et&&timers.et[currentExId])||null; }
+function etSet(rec){
+  if(!timers.et||typeof timers.et!=='object') timers.et={};
+  timers.et[currentExId]=rec;
+}
 function etLeft(e){ return e.endAt?Math.max(0,(e.endAt-Date.now())/1000):Math.max(0,e.left||0); }
 function etToggle(total){
   const e=etRecord();
   if(e&&e.endAt){                              // running -> hold
-    timers.ex={exId:currentExId,total:e.total,left:etLeft(e)};
+    etSet({total:e.total,left:etLeft(e)});
   }else{                                       // start, or pick up where it was held
     const left=(e&&e.left>0)?e.left:total;
-    timers.ex={exId:currentExId,total:total,endAt:Date.now()+left*1000};
+    etSet({total:total,endAt:Date.now()+left*1000});
   }
   saveTimers(); startTicker(); renderExTimer();
 }
 function etReset(total){
-  timers.ex={exId:currentExId,total:total,left:total}; saveTimers(); renderExTimer();
+  etSet({total:total,left:total}); saveTimers(); renderExTimer();
 }
 // Leaving the detail screen holds the countdown where it is, which is what the
 // interval version did by clearing itself while keeping its remaining value.
 function etPause(){
-  const e=timers.ex;
-  if(e&&e.endAt){ e.left=etLeft(e); delete e.endAt; saveTimers(); }
+  Object.values(timers.et||{}).forEach(e=>{
+    if(e&&e.endAt){ e.left=etLeft(e); delete e.endAt; saveTimers(); }
+  });
 }
 function renderExTimer(){
   const disp=document.getElementById('et-disp'); if(!disp) return;

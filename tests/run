@@ -1457,6 +1457,76 @@ def test_ending_a_workout_leaves_no_timers_behind():
 
 
 
+def test_each_timed_exercise_keeps_its_own_countdown():
+    print("\ntimed exercises keep their own countdowns (browser)")
+    if not browser():
+        skip("per-exercise countdown", "no chromium found")
+        return
+    # There used to be one countdown slot for every timed exercise, so
+    # starting Plank threw away the 1:40 already run off Row. In a circuit,
+    # or with two timed exercises in a phase, that is the normal order.
+    state = json.loads(json.dumps(DEMO))
+    state["plans"][0]["exercises"].append(
+        {"id": "x3", "phaseId": "ph", "icon": "3", "name": "Plank", "muscle": "core",
+         "type": "time", "sets": 1, "reps": "", "sithoehe": "", "kg": "",
+         "pauseSecs": None, "durationSecs": 60, "note": ""})
+    body = """
+      const REAL=Date.now(); let off=0;
+      w.Date.now = () => REAL + off;
+      w.playBeep=()=>{}; w.vibrate=()=>{}; w.showNotification=()=>{};
+      const disp=()=>d.getElementById('et-disp').textContent;
+      const btn=()=>d.getElementById('et-btn').textContent;
+
+      w.startWithPlan('p1'); w.openDetail('x2'); w.etToggle(480);
+      off=100000; w.tickAll();
+      ok('Row runs down to 6:20', disp(), '6:20');
+      w.goBack(); w.openDetail('x3');
+      ok('Plank opens at its own length', disp(), '1:00');
+      w.etToggle(60); off=110000; w.tickAll();
+      ok('Plank runs while Row is held', disp(), '0:50');
+      w.goBack(); w.openDetail('x2');
+      ok('Row reopens where it was held', disp(), '6:20');
+      ok('Row offers to resume, not to start', btn().includes('RESUME'), true);
+      off=500000; w.tickAll();
+      ok('a held Row does not drift', disp(), '6:20');
+      w.etToggle(480); off=520000; w.tickAll();
+      ok('Row resumes from 6:20', disp(), '6:00');
+      w.etReset(480);
+      ok('resetting Row starts it over', disp(), '8:00');
+      w.goBack(); w.openDetail('x3');
+      ok('Plank keeps its own time through all of that', disp(), '0:50');
+      ok('only Plank and Row are stored',
+         Object.keys(JSON.parse(w.localStorage.getItem('tp4_timers')).et).sort().join(','), 'x2,x3');
+
+      w.confirm=()=>true; w.newWorkout();
+      ok('a new workout clears every countdown', JSON.stringify(w.eval('timers')), '{"sw":{}}');
+
+      // A tp4_timers written by an older build: the single slot, Row held.
+      w.localStorage.setItem('tp4_timers', JSON.stringify(
+        {sw:{}, ex:{exId:'x2', total:480, left:380}}));
+      f.contentWindow.location.reload();
+      setTimeout(()=>{
+        try{
+          const w2=f.contentWindow, d2=f.contentDocument;
+          ok('old timers: the app is up', !!d2.getElementById('et-disp')||!!d2.getElementById('timerOverlay'), true);
+          ok('old timers: the single slot is gone', 'ex' in w2.eval('timers'), false);
+          ok('old timers: Row is carried over', JSON.stringify(w2.eval('timers.et')), '{"x2":{"total":480,"left":380}}');
+          ok('old timers: the new shape is saved',
+             JSON.stringify(JSON.parse(w2.localStorage.getItem('tp4_timers')).et), '{"x2":{"total":480,"left":380}}');
+          w2.startWithPlan('p1'); w2.openDetail('x2');
+          ok('old timers: Row reopens at 6:20', d2.getElementById('et-disp').textContent, '6:20');
+          w2.goBack(); w2.openDetail('x3');
+          ok('old timers: Plank starts fresh', d2.getElementById('et-disp').textContent, '1:00');
+        }catch(e){ out.push('FAIL|reload check threw|'+e.message+'|-'); }
+        document.title=out.join('~');
+      }, 2500);
+    """
+    results = drive(state, body)
+    report(results, "per-exercise countdown")
+    check("per-exercise countdown: the reloaded app was inspected",
+          any("old timers: the app is up" in r for r in results), True)
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
