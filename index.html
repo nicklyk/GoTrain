@@ -986,8 +986,8 @@ const T = {
 // never sees the other two. The number shown comes from index.html, so it
 // reports the build actually running: an old page served from a stale cache
 // reports its own old number, which is the point.
-const APP_VERSION='38';
-const APP_BUILD='2026-10-16';
+const APP_VERSION='39';
+const APP_BUILD='2026-10-24';
 
 // ══════════════════════════════════════════════
 // ADD TO HOME SCREEN
@@ -2066,8 +2066,7 @@ function completeSet(exId,setNum){
   }
   updateProgress();
   if(setNum<ex.sets){
-    document.getElementById('tovNext').innerHTML=`${t('set')} <strong>${setNum+1}/${escHtml(ex.sets)}</strong>`;
-    startPauseTimer(pauseFor(ex));
+    startPauseTimer(pauseFor(ex),exId,setNum+1);
   } else {
     // Last set done – auto-mark exercise as done
     setDone(exId); saveState(); updateProgress();
@@ -2180,8 +2179,14 @@ function clearAllTimers(){
 }
 
 // ── rest between sets ──────────────────────────────────────────────────
-function startPauseTimer(secs){
-  timers.rest={endAt:Date.now()+secs*1000,total:secs}; saveTimers();
+// The rest remembers which set it leads to, so the "Set n/m" line can be
+// drawn from the record rather than written once when the set was ticked.
+// Written once, it was blank after a reload -- which on iOS includes the
+// system killing the PWA mid-rest -- and stale after the set count changed.
+function startPauseTimer(secs,exId,nextSet){
+  timers.rest={endAt:Date.now()+secs*1000,total:secs};
+  if(exId&&nextSet){ timers.rest.exId=exId; timers.rest.set=nextSet; }
+  saveTimers();
   const ov=document.getElementById('timerOverlay'); if(ov) ov.classList.add('active');
   startTicker(); renderRestTimer();
 }
@@ -2215,11 +2220,23 @@ function renderRestTimer(){
     const num=document.getElementById('tovNum'), bar=document.getElementById('tovBar');
     if(num) num.textContent=Math.ceil(rem);
     if(bar) bar.style.strokeDashoffset=circ*(1-rem/r.total);
+    renderRestNext(r);
     return;
   }
   const late=-rem;
   clearRestTimer();
   if(late<=TIMER_ALERT_GRACE){ playBeep(660,0.1,2); vibrate([80,60,80]); }
+}
+
+// A record from an older build has no exId and gets no line, as before. So
+// does one whose exercise is gone or now has fewer sets than the one it was
+// counting toward: "Set 3/2" would be worse than nothing.
+function renderRestNext(r){
+  const el=document.getElementById('tovNext'); if(!el) return;
+  const ex=r.exId?getEx(r.exId):null, n=Number(ex&&ex.sets);
+  const html=(ex&&r.set>=1&&r.set<=n)?`${t('set')} <strong>${escHtml(r.set)}/${escHtml(n)}</strong>`:'';
+  // The ticker calls this four times a second; only touch the DOM on change.
+  if(el.innerHTML!==html) el.innerHTML=html;
 }
 
 // ── a timed exercise's countdown ───────────────────────────────────────
