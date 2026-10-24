@@ -1457,6 +1457,62 @@ def test_ending_a_workout_leaves_no_timers_behind():
 
 
 
+def test_the_rest_remembers_which_set_it_leads_to():
+    print("\nrest overlay names its set after a reload (browser)")
+    if not browser():
+        skip("rest set line", "no chromium found")
+        return
+    # The "Set n/m" line used to be written once, when the set was ticked, so a
+    # rest restored from tp4_timers -- after a reload, or iOS killing the PWA
+    # mid-rest -- counted down with an empty line under it (B-29).
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      const line=()=>d.getElementById('tovNext').textContent;
+      w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1);
+      ok('ticking set 1 names set 2', line(), 'Set 2/3');
+      ok('the record keeps the exercise', w.eval('timers.rest.exId'), 'x1');
+      ok('and the set it leads to', w.eval('timers.rest.set'), 2);
+      // An adjustment for today lowers the count while the rest runs; the
+      // line follows the count instead of still saying 2/3.
+      w.openAdjust(); d.getElementById('adj-sets').value='2'; w.saveAdjust(); w.tickAll();
+      ok('a lowered count is reflected', line(), 'Set 2/2');
+      w.resetAdjust(); w.tickAll();
+      ok('and restored', line(), 'Set 2/3');
+      // Set 2 ticked, then the count lowered under the set the rest leads to.
+      w.completeSet('x1',2);
+      ok('ticking set 2 names set 3', line(), 'Set 3/3');
+      w.openAdjust(); d.getElementById('adj-sets').value='2'; w.saveAdjust(); w.tickAll();
+      ok('no "Set 3/2" when the count drops below it', line(), '');
+      w.resetAdjust(); w.tickAll();
+      ok('the line comes back with the set', line(), 'Set 3/3');
+      f.contentWindow.location.reload();
+      setTimeout(()=>{
+        try{
+          const w2=f.contentWindow, d2=f.contentDocument;
+          ok('after a reload the rest is still up', d2.getElementById('timerOverlay').classList.contains('active'), true);
+          ok('after a reload the overlay names the set', d2.getElementById('tovNext').textContent, 'Set 3/3');
+          // A rest saved by an older build has no exercise or set in it.
+          w2.localStorage.setItem('tp4_timers', JSON.stringify({sw:{}, rest:{endAt:Date.now()+60000,total:60}}));
+          w2.location.reload();
+          setTimeout(()=>{
+            try{
+              const d3=f.contentDocument, w3=f.contentWindow;
+              ok('an old rest record is restored', d3.getElementById('timerOverlay').classList.contains('active'), true);
+              ok('it still counts', Number(d3.getElementById('tovNum').textContent)>0, true);
+              ok('it shows no line', d3.getElementById('tovNext').textContent, '');
+              ok('and the app came up whole', !!d3.getElementById('screen-workout'), true);
+            }catch(e){ out.push('FAIL|old record check threw|'+e.message+'|-'); }
+            document.title=out.join('~');
+          }, 2500);
+        }catch(e){ out.push('FAIL|reload check threw|'+e.message+'|-'); document.title=out.join('~'); }
+      }, 2500);
+    """
+    results = drive(DEMO, body)
+    report(results, "rest set line")
+    check("rest set line: the old-format record was inspected",
+          any("it shows no line" in r for r in results), True)
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
