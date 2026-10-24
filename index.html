@@ -1724,6 +1724,9 @@ function updateProgress(){
 // ══════════════════════════════════════════════
 let currentExId=null;
 function openDetail(exId){
+  // The Next exercise banner opens the next one straight from here, without
+  // goBack, so the outgoing countdown has to be held on the way out.
+  if(currentExId&&currentExId!==exId) etPause();
   currentExId=exId; const ex=getEx(exId);
   document.getElementById('d-name').textContent=ex.name;
   document.getElementById('d-muscle').textContent=muscleLabel(ex.muscle)+' – '+(ex.type==='time'?t('time-ex'):t('strength-ex'));

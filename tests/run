@@ -1498,6 +1498,23 @@ def test_each_timed_exercise_keeps_its_own_countdown():
       ok('only Plank and Row are stored',
          Object.keys(JSON.parse(w.localStorage.getItem('tp4_timers')).et).sort().join(','), 'x2,x3');
 
+      // The Next exercise banner opens Plank straight from Row's screen,
+      // without goBack, so Row used to keep running out of sight and its
+      // alert fired late, the next time Row was opened.
+      w.openDetail('x2'); w.etToggle(480); off=530000; w.tickAll();
+      ok('Row runs again', disp(), '7:50');
+      w.markExDone();
+      ok('Complete does not hold Row', !!w.eval('timers.et.x2.endAt'), true);
+      d.querySelector('#next-ex-slot [onclick]').click();
+      ok('the banner opens Plank', d.getElementById('d-name').textContent, 'Plank');
+      ok('opening Plank from the banner holds Row', !!w.eval('timers.et.x2.endAt'), false);
+      w.etToggle(60); off=540000; w.tickAll();
+      ok('Plank runs from where it was held', disp(), '0:40');
+      ok('only one countdown runs',
+         Object.values(w.eval('timers.et')).filter(e=>e.endAt).length, 1);
+      w.goBack(); w.openDetail('x2');
+      ok('Row reads where the banner left it', disp(), '7:50');
+
       w.confirm=()=>true; w.newWorkout();
       ok('a new workout clears every countdown', JSON.stringify(w.eval('timers')), '{"sw":{}}');
 
