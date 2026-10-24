@@ -3238,9 +3238,9 @@ function renderHistory(){
   let h='';
   if(allDone) h+=`<div class="congrats"><div class="big">🏆</div><h2>${t('congrats.title')}</h2><p>${t('congrats.sub')}</p></div>`;
   if(!state.history.length&&!allDone){cont.innerHTML=h+`<div class="empty-state"><div class="big">📋</div>${t('no-history')}</div>`;return;}
-  state.history.forEach(entry=>{
+  state.history.forEach((entry,i)=>{
     const pct=entry.totalExercises?Math.round(entry.doneExercises/entry.totalExercises*100):0;
-    h+=`<div class="h-card" onclick="openHistoryDetail('${entry.id}')">
+    h+=`<div class="h-card" onclick="openHistoryDetail(${i})">
       <div class="h-title">${escHtml(entry.plan)} · ${escHtml(entryDate(entry))} <span class="h-card-arrow">›</span></div>
       <div class="h-row"><span>${t('history.time')}</span><span class="h-val">${escHtml(entryTime(entry))}</span></div>
       <div class="h-row"><span>${t('history.detail.exercises')}</span><span class="h-val">${escHtml(entry.doneExercises||0)}/${escHtml(entry.totalExercises||0)}</span></div>
@@ -3250,9 +3250,11 @@ function renderHistory(){
   cont.innerHTML=h;
 }
 
+// Opened by position, not by id: imported entries may share an empty id or
+// have none, and a lookup by id would open (and offer to delete) another one.
 let openHistoryEntry=null;
-function openHistoryDetail(entryId){
-  const entry=state.history.find(e=>e.id===entryId); if(!entry) return;
+function openHistoryDetail(i){
+  const entry=state.history[i]; if(!entry) return;
   openHistoryEntry=entry;
   document.getElementById('hd-title').textContent=entry.plan.toUpperCase();
   document.getElementById('hd-sub').textContent=entryDate(entry)+' · '+entryTime(entry);

@@ -381,7 +381,7 @@ def test_user_text_cannot_inject_markup():
       w.showSettingsTab('globalex');
       w.showScreen('workout'); w.startWithPlan('p1');
       w.openDetail('x1');
-      w.showScreen('history'); w.openHistoryDetail('h1');
+      w.showScreen('history'); w.openHistoryDetail(0);
       w.openPlanDetail('p1'); w.showPlanTab('exercises'); w.showPlanTab('phases');
 
       // Not asserting on a global the handler would set: an onerror fires
@@ -414,7 +414,7 @@ def test_user_text_cannot_inject_markup():
       ok('the library parsed no element out of it',
          lib.querySelectorAll('i').length, 0);
 
-      w.showScreen('history'); w.openHistoryDetail('h1');
+      w.showScreen('history'); w.openHistoryDetail(0);
       const hd = d.querySelector('.hd-ex-name');
       ok('history shows the name literally',
          hd.textContent.indexOf('<img src=x onerror=') >= 0, true);
@@ -478,7 +478,7 @@ def test_imported_fields_cannot_inject_markup():
 
       w.showScreen('history');
       ok('history list: no field became an element', leaked(), '');
-      w.openHistoryDetail('h1');
+      w.openHistoryDetail(0);
       ok('history detail: no field became an element', leaked(), '');
       ok('history detail shows the plan name literally',
          d.querySelector('#hd-info').textContent.indexOf('<img src=x data-f=plan>') >= 0, true);
@@ -1471,7 +1471,7 @@ def test_one_history_entry_can_be_deleted():
       const realConfirm=w.confirm;
       w.showScreen('history');
       ok('three entries are listed', d.querySelectorAll('#history-content .h-card').length, 3);
-      w.openHistoryDetail('s2');
+      w.openHistoryDetail(1);
       const btn=d.getElementById('hd-delete');
       ok('the detail screen offers a delete button', btn.textContent, 'Delete this workout');
 
@@ -1499,8 +1499,8 @@ def test_one_history_entry_can_be_deleted():
          d.getElementById('d-last').textContent.indexOf('65 kg') >= 0, true);
 
       // The last one leaves the empty state, not a broken screen.
-      w.openHistoryDetail('s3'); d.getElementById('hd-delete').click();
-      w.openHistoryDetail('s1'); d.getElementById('hd-delete').click();
+      w.openHistoryDetail(0); d.getElementById('hd-delete').click();
+      w.openHistoryDetail(0); d.getElementById('hd-delete').click();
       ok('the history can be emptied one by one', S().history.length, 0);
       ok('the empty state is shown',
          !!d.querySelector('#history-content .empty-state'), true);
@@ -1513,16 +1513,29 @@ def test_one_history_entry_can_be_deleted():
     """
     report(drive(st, body), "delete history entry")
 
-    # Older exports may carry empty ids, which idsLookSafe allows. Deleting one
-    # such entry must not take the others that share the empty id.
+    # Older exports may carry empty ids, which idsLookSafe allows. Each card
+    # must open its own entry -- a lookup by id opened the first of them for
+    # every card, and Delete then removed that one instead of the one tapped --
+    # and deleting must not take the others that share the empty id.
     dup = _with_history([_session("", "2026-09-12T18:00:00Z", "60"),
-                         _session("", "2026-09-05T18:00:00Z", "55")])
+                         _session("", "2026-09-05T18:00:00Z", "55"),
+                         _session("", "2026-08-29T18:00:00Z", "50")])
+    del dup["history"][2]["id"]
     body2 = """
       w.confirm=()=>true;
-      w.openHistoryDetail(''); d.getElementById('hd-delete').click();
+      const card=n=>d.querySelectorAll('#history-content .h-card')[n];
+      const shown=()=>d.getElementById('hd-exercises').textContent;
+      w.showScreen('history');
+      card(2).click();
+      ok('an entry with no id opens', shown().indexOf('50kg') >= 0, true);
+      w.showScreen('history');
+      card(1).click();
+      ok('a shared empty id: the second card opens the second entry', shown().indexOf('55kg') >= 0, true);
+      d.getElementById('hd-delete').click();
       const h=w.eval('state').history;
-      ok('a shared empty id: exactly one entry is deleted', h.length, 1);
-      ok('a shared empty id: it is the one that was open', h[0].exercises[0].kg, '55');
+      ok('a shared empty id: exactly one entry is deleted', h.length, 2);
+      ok('a shared empty id: it is the one that was tapped',
+         JSON.stringify(h.map(e=>e.exercises[0].kg)), '["60","50"]');
     """
     report(drive(dup, body2), "delete history entry with empty ids")
 
@@ -1539,7 +1552,7 @@ def test_one_history_entry_can_be_deleted():
       let txt=d.getElementById('d-last').textContent;
       ok('before: the mistaken entry is last time', txt.indexOf('100 kg') >= 0, true);
       ok('before: and hides the new best', txt.indexOf('★'), -1);
-      w.openHistoryDetail('s3'); d.getElementById('hd-delete').click();
+      w.openHistoryDetail(0); d.getElementById('hd-delete').click();
       w.startWithPlan('p1'); w.openDetail('x1');
       txt=d.getElementById('d-last').textContent;
       ok('after: last time is the newest entry left', txt.indexOf('60 kg') >= 0, true);
