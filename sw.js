@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 // GoTrain Service Worker
-const CACHE_NAME = 'gotrain-v38';
+const CACHE_NAME = 'gotrain-v39';
 const ASSETS = [
   './',
   './index.html',
