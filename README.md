@@ -16,17 +16,22 @@ unless you choose to move it.
 - **Phases** — group exercises into colour-coded blocks (Warm Up, Strength, Cool Down…)
 - **Exercise library** — define exercises once with a muscle group and reuse
   them, with a filter that ignores case and accents
-- **Reps or time** — sets and reps, or a countdown for timed exercises
+- **Reps or time** — sets and reps, or a countdown for timed exercises. Each
+  timed exercise keeps its own countdown, so moving between two of them in a
+  circuit loses no time on either
 - **Live tracking** — tick off sets, rest timer between sets that you can
   lengthen or shorten while it runs, stopwatch per set
 - **Timers that survive a locked phone** — every timer runs off the clock, so
   locking the screen or switching apps never loses time; come back and it has
-  caught up. The screen stays on during a workout where the browser allows it
+  caught up. A rest survives a reload too, still naming the set it leads to.
+  The screen stays on during a workout where the browser allows it
 - **Duration wheel** — rest and exercise times are set on a minutes/seconds
   scroll wheel
 - **Last time** — each exercise shows what you lifted in the previous session,
   and flags it when today's weight would be a new best
-- **History** — every finished session is saved with its full exercise detail
+- **History** — every finished session is saved with its full exercise detail.
+  One finished by mistake can be deleted from its detail screen, so it stops
+  feeding *Last time* and your best
 - **Progress** — the weight you set per exercise is kept with each session, so
   your load over time is recorded, not just that you turned up
 - **Phone to PC** — scan a pairing code and hand your data to a desktop over
@@ -147,6 +152,10 @@ to be a GDPR violation (LG München I, judgment of 20 January 2022, case
 workouts onto an [Omarchy](https://omarchy.org) desktop: a bar widget, recent
 sessions, strength progression and a local archive that outlives any phone
 reset. It is optional — GoTrain is complete on its own.
+
+The archive keeps every workout it has received, so one you delete in GoTrain
+afterwards stays on the desktop, and comes back if you load `gotrain export`
+into the app.
 
 ## Development
 
