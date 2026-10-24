@@ -381,7 +381,7 @@ def test_user_text_cannot_inject_markup():
       w.showSettingsTab('globalex');
       w.showScreen('workout'); w.startWithPlan('p1');
       w.openDetail('x1');
-      w.showScreen('history'); w.openHistoryDetail('h1');
+      w.showScreen('history'); w.openHistoryDetail(0);
       w.openPlanDetail('p1'); w.showPlanTab('exercises'); w.showPlanTab('phases');
 
       // Not asserting on a global the handler would set: an onerror fires
@@ -414,7 +414,7 @@ def test_user_text_cannot_inject_markup():
       ok('the library parsed no element out of it',
          lib.querySelectorAll('i').length, 0);
 
-      w.showScreen('history'); w.openHistoryDetail('h1');
+      w.showScreen('history'); w.openHistoryDetail(0);
       const hd = d.querySelector('.hd-ex-name');
       ok('history shows the name literally',
          hd.textContent.indexOf('<img src=x onerror=') >= 0, true);
@@ -478,7 +478,7 @@ def test_imported_fields_cannot_inject_markup():
 
       w.showScreen('history');
       ok('history list: no field became an element', leaked(), '');
-      w.openHistoryDetail('h1');
+      w.openHistoryDetail(0);
       ok('history detail: no field became an element', leaked(), '');
       ok('history detail shows the plan name literally',
          d.querySelector('#hd-info').textContent.indexOf('<img src=x data-f=plan>') >= 0, true);
@@ -1598,6 +1598,111 @@ def test_each_timed_exercise_keeps_its_own_countdown():
     report(results, "per-exercise countdown")
     check("per-exercise countdown: the reloaded app was inspected",
           any("old timers: the app is up" in r for r in results), True)
+
+
+def test_one_history_entry_can_be_deleted():
+    print("\ndeleting one history entry (browser)")
+    if not browser():
+        skip("delete history entry", "no chromium found")
+        return
+    st = _with_history([_session("s3", "2026-09-19T18:00:00Z", "65"),
+                        _session("s2", "2026-09-12T18:00:00Z", "60"),
+                        _session("s1", "2026-09-05T18:00:00Z", "55")])
+    body = """
+      const S=()=>w.eval('state');
+      const stored=()=>JSON.parse(w.localStorage.getItem('tp4_state')).history.map(e=>e.id).join(',');
+      const realConfirm=w.confirm;
+      w.showScreen('history');
+      ok('three entries are listed', d.querySelectorAll('#history-content .h-card').length, 3);
+      w.openHistoryDetail(1);
+      const btn=d.getElementById('hd-delete');
+      ok('the detail screen offers a delete button', btn.textContent, 'Delete this workout');
+
+      // Cancelling the confirm changes nothing.
+      w.confirm=()=>false;
+      btn.click();
+      ok('cancel: all entries are kept', S().history.map(e=>e.id).join(','), 's3,s2,s1');
+      ok('cancel: the detail screen stays open',
+         d.getElementById('screen-history-detail').classList.contains('active'), true);
+
+      w.confirm=()=>true;
+      btn.click();
+      ok('only the open entry is gone', S().history.map(e=>e.id).join(','), 's3,s1');
+      ok('and not in storage either', stored(), 's3,s1');
+      ok('the others are untouched',
+         JSON.stringify(S().history.map(e=>e.exercises[0].kg)), '["65","55"]');
+      ok('the history list is shown again',
+         d.getElementById('screen-history').classList.contains('active'), true);
+      ok('the list is re-rendered without it',
+         d.querySelectorAll('#history-content .h-card').length, 2);
+
+      // "Last time" now reads the session before it.
+      w.startWithPlan('p1'); w.openDetail('x1');
+      ok('last time still finds the newest remaining session',
+         d.getElementById('d-last').textContent.indexOf('65 kg') >= 0, true);
+
+      // The last one leaves the empty state, not a broken screen.
+      w.openHistoryDetail(0); d.getElementById('hd-delete').click();
+      w.openHistoryDetail(0); d.getElementById('hd-delete').click();
+      ok('the history can be emptied one by one', S().history.length, 0);
+      ok('the empty state is shown',
+         !!d.querySelector('#history-content .empty-state'), true);
+
+      // German label.
+      w.changeLang('de');
+      ok('the button is translated',
+         d.getElementById('hd-delete').textContent, 'Dieses Training löschen');
+      w.confirm=realConfirm;
+    """
+    report(drive(st, body), "delete history entry")
+
+    # Older exports may carry empty ids, which idsLookSafe allows. Each card
+    # must open its own entry -- a lookup by id opened the first of them for
+    # every card, and Delete then removed that one instead of the one tapped --
+    # and deleting must not take the others that share the empty id.
+    dup = _with_history([_session("", "2026-09-12T18:00:00Z", "60"),
+                         _session("", "2026-09-05T18:00:00Z", "55"),
+                         _session("", "2026-08-29T18:00:00Z", "50")])
+    del dup["history"][2]["id"]
+    body2 = """
+      w.confirm=()=>true;
+      const card=n=>d.querySelectorAll('#history-content .h-card')[n];
+      const shown=()=>d.getElementById('hd-exercises').textContent;
+      w.showScreen('history');
+      card(2).click();
+      ok('an entry with no id opens', shown().indexOf('50kg') >= 0, true);
+      w.showScreen('history');
+      card(1).click();
+      ok('a shared empty id: the second card opens the second entry', shown().indexOf('55kg') >= 0, true);
+      d.getElementById('hd-delete').click();
+      const h=w.eval('state').history;
+      ok('a shared empty id: exactly one entry is deleted', h.length, 2);
+      ok('a shared empty id: it is the one that was tapped',
+         JSON.stringify(h.map(e=>e.exercises[0].kg)), '["60","50"]');
+    """
+    report(drive(dup, body2), "delete history entry with empty ids")
+
+    # The point of deleting: a mistaken newest entry stops feeding "Last time"
+    # and the personal best. Deleting the middle entry above cannot show this,
+    # because the newest one answers "Last time" either way.
+    wrong = _with_history([_session("s3", "2026-09-19T18:00:00Z", "100"),
+                           _session("s2", "2026-09-12T18:00:00Z", "60"),
+                           _session("s1", "2026-09-05T18:00:00Z", "55")])
+    wrong["plans"][0]["exercises"][0]["kg"] = "62"
+    body3 = """
+      w.confirm=()=>true;
+      w.startWithPlan('p1'); w.openDetail('x1');
+      let txt=d.getElementById('d-last').textContent;
+      ok('before: the mistaken entry is last time', txt.indexOf('100 kg') >= 0, true);
+      ok('before: and hides the new best', txt.indexOf('★'), -1);
+      w.openHistoryDetail(0); d.getElementById('hd-delete').click();
+      w.startWithPlan('p1'); w.openDetail('x1');
+      txt=d.getElementById('d-last').textContent;
+      ok('after: last time is the newest entry left', txt.indexOf('60 kg') >= 0, true);
+      ok('after: the mistaken weight is gone', txt.indexOf('100 kg'), -1);
+      ok('after: 62 kg is a new best again', txt.indexOf('★') >= 0, true);
+    """
+    report(drive(wrong, body3), "delete history entry feeds last time")
 
 
 def main():
