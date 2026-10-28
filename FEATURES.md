@@ -32,3 +32,7 @@ Nothing waiting. Add ideas here.
 - F-4 · Filter the exercise library — GoTrain v34
 - F-5 · `gotrain today` — omarchy-gotrain 1.3.0
 - F-6 · `gotrain export --csv` — omarchy-gotrain 1.4.0
+- F-7 · Design pass: one-tap start from the home screen, the exercise on one
+  screen with ±2.5 kg for today, the next set's target during the rest, and
+  History by week with each workout's duration and new bests — GoTrain v42
+  (https://github.com/nicklyk/GoTrain/pull/17)
