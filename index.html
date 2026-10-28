@@ -134,7 +134,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
   --font-display: 'Bebas Neue', 'Arial Narrow', 'Impact', sans-serif;
   --font-body: 'DM Sans', -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
-:root{--bg:#0d0d0f;--surface:#18181c;--surface2:#222228;--surface3:#2c2c35;--accent:#c8f135;--accent2:#8bbb1a;--text:#f0f0f0;--muted:#6b6b7a;--done:#1e2e08;--done-border:#6da010;--danger:#ff4d4d;--radius:16px}
+:root{--bg:#0d0d0f;--surface:#18181c;--surface2:#222228;--surface3:#2c2c35;--accent:#c8f135;--accent2:#8bbb1a;--text:#f0f0f0;--muted:#8a8a99;--done:#1e2e08;--done-border:#6da010;--danger:#ff4d4d;--radius:16px}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 /* The document's scroll container is the viewport, which the root element
    controls -- body alone is not reliably enough. Needs iOS 16+, and even
@@ -174,15 +174,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .plan-chip-add{background:transparent;border:1.5px dashed #3a3a45;border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;flex-shrink:0}
 .screen{display:none;padding:16px;padding-bottom:120px}
 .screen.active{display:block}
-.phase-card{border-radius:var(--radius);padding:12px 16px;margin-bottom:10px;border:1px solid #2a2a33}
-.phase-label{font-size:10px;font-weight:600;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
-.phase-title{font-family:var(--font-display);font-size:20px;letter-spacing:1px}
+/* A phase is a heading over its exercises, not a card as tall as one of them. */
+.phase-head{display:flex;align-items:baseline;justify-content:space-between;margin:18px 2px 8px;font-family:var(--font-display);font-size:18px;letter-spacing:1.5px}
+.phase-head:first-child{margin-top:2px}
+.ph-count{font-family:var(--font-body);font-size:12px;font-weight:600;letter-spacing:0;color:var(--muted);font-variant-numeric:tabular-nums}
 .exercise-item{background:var(--surface);border-radius:var(--radius);padding:14px;margin-bottom:9px;border:1px solid #2a2a33;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color .2s,background .2s;-webkit-user-select:none}
 .exercise-item.done{background:var(--done);border-color:var(--done-border)}
 .ex-icon{width:42px;height:42px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .exercise-item.done .ex-icon{background:var(--done)}
 .ex-info{flex:1;min-width:0}
-.ex-muscle{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:1px}
+.ex-muscle{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:1px}
 .ex-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ex-meta{font-size:11px;color:var(--muted);margin-top:1px}
 .ex-dots{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
@@ -195,6 +196,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .btn-primary:disabled{background:var(--done-border);opacity:.7}
 .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid #3a3a45;border-radius:var(--radius);font-size:14px;font-weight:600;padding:12px 16px;width:100%;cursor:pointer;margin-top:8px}
 .btn-outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent);border-radius:var(--radius);font-family:var(--font-display);font-size:17px;letter-spacing:2px;padding:13px 20px;width:100%;cursor:pointer;margin-top:6px}
+.btn-text-danger{background:none;border:none;color:var(--danger);font-size:14px;font-weight:600;padding:16px;width:100%;cursor:pointer;margin-top:4px}
 .btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);border-radius:var(--radius);font-size:13px;font-weight:600;padding:10px 16px;cursor:pointer;margin-top:8px;width:100%}
 .detail-header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
 /* Plan editor only: the back button and plan name stay put while the list
@@ -208,14 +210,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .detail-title{font-family:var(--font-display);font-size:24px;letter-spacing:1px;line-height:1.1}
 .detail-sub{font-size:11px;color:var(--muted);margin-top:2px}
 .last-time{background:var(--surface);border:1px solid #2a2a33;border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.lt-label{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase}
+.lt-label{font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase}
 .lt-val{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
 .lt-best{color:var(--accent);font-weight:600}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+/* The exercise at a glance: one block instead of four boxes, so the sets are
+   on screen without scrolling. The weight steps by 2.5 kg right here, since
+   that is the change made most often between sets. */
+.ex-sum{background:var(--surface);border:1px solid #2a2a33;border-radius:var(--radius);padding:12px 14px;margin-bottom:14px}
+.es-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.es-main{font-family:var(--font-display);font-size:32px;letter-spacing:1px;color:var(--accent);line-height:1;white-space:nowrap}
+.es-kg{display:flex;align-items:center;gap:6px}
+.es-kg-val{font-family:var(--font-display);font-size:26px;color:var(--text);min-width:60px;text-align:center;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
+.es-kg-val small{font-size:15px;color:var(--muted)}
+.kg-step{background:var(--surface2);border:1px solid #3a3a45;color:var(--text);border-radius:10px;min-width:44px;height:40px;padding:0 6px;font-size:13px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
+.kg-step:active{background:var(--surface3)}
+.es-sub{font-size:12px;color:var(--muted);margin-top:8px}
 .info-box{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:12px}
-.ib-label{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.ib-label{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .ib-val{font-family:var(--font-display);font-size:22px;color:var(--accent);margin-top:1px}
-.ib-sub{font-size:10px;color:var(--muted)}
+.ib-sub{font-size:11px;color:var(--muted)}
 .note-box{background:var(--surface2);border-radius:12px;padding:12px 14px;border-left:3px solid var(--accent);font-size:13px;color:#c0c0c0;margin-bottom:14px}
 .sec-label{font-family:var(--font-display);font-size:16px;letter-spacing:1px;color:var(--muted);margin:16px 0 10px}
 .set-row{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;transition:all .2s}
@@ -230,19 +244,27 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .set-row.done-row .chk{background:var(--accent);border-color:var(--accent);color:#0d0d0f}
 .wbadge{background:var(--surface2);border:1px solid #3a3a45;border-radius:8px;padding:2px 8px;font-size:12px;font-weight:600;color:var(--accent);margin-left:6px}
 .sw-wrap{display:flex;align-items:center;gap:8px;margin-top:6px}
+/* The per-set stopwatch stays out of the way until it is used: most sets are
+   just ticked. The small button starts it; once it has time on it, its full
+   controls show. */
+.sw-wrap.off{display:none}
+.sr-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sw-show{background:transparent;border:none;color:var(--muted);width:34px;height:34px;padding:5px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.sw-show svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sw-show.off{display:none}
 .sw-time{font-family:var(--font-display);font-size:18px;color:var(--accent);min-width:52px}
 .sw-btn{background:var(--surface2);border:1.5px solid #3a3a45;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;white-space:nowrap}
-.sw-btn.active{background:#ff9f1c;border-color:#ff9f1c;color:#0d0d0f}
+.sw-btn.active{background:#fff;border-color:#fff;color:#0d0d0f}
 .ex-timer{background:var(--surface2);border-radius:var(--radius);border:1px solid #3a3a45;padding:16px;margin-bottom:14px;text-align:center}
 .et-disp{font-family:var(--font-display);font-size:56px;letter-spacing:4px;color:var(--accent);line-height:1;margin-bottom:4px}
 .et-disp.running{color:#fff}.et-disp.finished{color:var(--done-border)}
-.et-lbl{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.et-lbl{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
 .et-bar-wrap{background:var(--surface3);border-radius:4px;height:4px;margin-bottom:14px;overflow:hidden}
 .et-bar{height:100%;background:var(--accent);border-radius:4px;transition:width .5s linear;width:100%}
 .et-bar.running{background:#fff}.et-bar.finished{background:var(--done-border)}
 .et-btns{display:flex;gap:8px}
 .et-btn{flex:1;border:none;border-radius:12px;font-family:var(--font-display);font-size:17px;letter-spacing:1px;padding:12px 8px;cursor:pointer}
-.et-btn.start{background:var(--accent);color:#0d0d0f}.et-btn.stop{background:#ff9f1c;color:#0d0d0f}.et-btn.reset{background:var(--surface3);color:var(--muted);flex:0 0 48px}
+.et-btn.start{background:var(--accent);color:#0d0d0f}.et-btn.stop{background:#fff;color:#0d0d0f}.et-btn.reset{background:var(--surface3);color:var(--muted);flex:0 0 48px}
 .timer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);backdrop-filter:blur(12px);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:22px}
 .timer-overlay.active{display:flex}
 .tov-lbl{font-family:var(--font-display);font-size:15px;letter-spacing:3px;color:var(--muted)}
@@ -253,13 +275,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .tov-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:54px;color:var(--accent)}
 .tov-next{font-size:13px;color:var(--muted);text-align:center}
 .tov-next strong{color:var(--text)}
+.tov-target{font-size:16px;font-weight:600;color:var(--text);text-align:center;margin-top:6px;font-variant-numeric:tabular-nums}
 .tov-adjust{display:flex;gap:12px}
 .tov-step{background:transparent;border:1px solid #3a3a45;color:var(--text);border-radius:var(--radius);font-size:15px;font-weight:600;padding:10px 22px;cursor:pointer;font-variant-numeric:tabular-nums}
 .tov-skip{background:var(--surface);border:1px solid #2a2a33;color:var(--text);border-radius:var(--radius);font-size:15px;font-weight:500;padding:12px 36px;cursor:pointer}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid #2a2a33;display:flex;padding:14px 0 36px;z-index:100}
-.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;transition:color .2s}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;color:var(--muted);transition:color .2s}
+.nav-ico{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nav-btn.active{color:var(--accent)}
-.nav-btn span{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.nav-btn span{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
 .s-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .s-lbl{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .s-inp{background:var(--surface2);border:1.5px solid #3a3a45;border-radius:10px;color:var(--text);font-family:var(--font-body);font-size:15px;padding:10px 12px;width:100%;outline:none;-webkit-appearance:none;appearance:none}
@@ -280,7 +304,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:16px;margin-bottom:10px}
 .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .card-name{font-family:var(--font-display);font-size:19px;letter-spacing:1px}
-.card-badge{font-size:10px;font-weight:600;letter-spacing:1px;color:var(--accent);background:rgba(200,241,53,.12);border-radius:6px;padding:3px 8px}
+.card-badge{font-size:11px;font-weight:600;letter-spacing:1px;color:var(--accent);background:rgba(200,241,53,.12);border-radius:6px;padding:3px 8px}
 .card-meta{font-size:12px;color:var(--muted);margin-bottom:12px}
 .card-btns{display:flex;gap:8px;flex-wrap:wrap}
 .c-btn{flex:1;border-radius:10px;padding:9px 8px;font-size:13px;font-weight:600;cursor:pointer;border:none;text-align:center;transition:all .15s;min-width:0}
@@ -288,6 +312,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .c-btn.activated{background:var(--surface2);color:var(--muted);pointer-events:none}
 .c-btn.edit{background:var(--surface2);color:var(--text);border:1px solid #3a3a45}
 .c-btn.del{background:transparent;color:var(--danger);border:1px solid var(--danger);flex:0 0 44px}
+/* The whole plan card opens the editor; renaming happens there. */
+.plan-card{display:flex;align-items:center;gap:12px;cursor:pointer}
+.plan-card:active{border-color:var(--accent)}
+.plan-card .card-meta{margin-bottom:0}
+.plan-card .c-btn.del{height:40px}
+.pd-rename{background:none;border:none;font-size:16px;cursor:pointer;padding:4px 6px;margin-left:4px}
+
 .gex-item{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:14px;margin-bottom:8px}
 .gex-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;-webkit-user-select:none}
 .gex-title{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
@@ -311,7 +342,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .plan-ex-btns{display:flex;gap:6px;flex-shrink:0}
 .pe-btn{background:var(--surface2);border:1px solid #3a3a45;border-radius:8px;padding:5px 8px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text);white-space:nowrap}
 .pe-btn.danger{color:var(--danger);border-color:var(--danger);background:transparent}
-.pe-select{background:var(--surface2);border:1px solid #3a3a45;border-radius:8px;padding:5px 6px;font-size:11px;color:var(--text);max-width:85px;outline:none;-webkit-appearance:none}
 
 /* ICON PICKER */
 .icon-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
@@ -358,11 +388,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .wheel-unit{position:absolute;right:0;top:50%;transform:translateY(-50%);width:38px;pointer-events:none;font-size:12px;color:var(--muted);z-index:2;text-align:left;padding-left:2px}
 
 /* HISTORY */
-.h-card{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:16px;margin-bottom:10px}
-.h-title{font-family:var(--font-display);font-size:18px;letter-spacing:1px;margin-bottom:10px;color:var(--accent)}
-.h-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #222;font-size:13px}
-.h-row:last-child{border-bottom:none}
-.h-val{color:var(--accent);font-weight:600}
+.h-week{display:flex;justify-content:space-between;align-items:baseline;margin:18px 2px 8px;font-family:var(--font-display);font-size:16px;letter-spacing:1.5px;color:var(--muted)}
+.h-week:first-child{margin-top:2px}
+.h-week span:last-child{font-family:var(--font-body);font-size:12px;font-weight:600;letter-spacing:0}
+.h-card{background:var(--surface);border-radius:var(--radius);border:1px solid #2a2a33;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.hc-main{flex:1;min-width:0}
+.hc-plan{font-family:var(--font-display);font-size:18px;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hc-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.hc-stat{text-align:right;font-size:14px;font-weight:600;color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.hc-sets{font-size:12px;font-weight:500;color:var(--muted)}
 .empty-state{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px}
 .empty-state .big{font-size:44px;margin-bottom:12px}
 .congrats{background:linear-gradient(135deg,#1a2e00,#2a4800);border:1px solid var(--done-border);border-radius:var(--radius);padding:22px;text-align:center;margin-bottom:14px}
@@ -404,10 +438,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .plan-select-card.selected{border-color:var(--accent);background:rgba(200,241,53,.07)}
 .psc-name{font-family:var(--font-display);font-size:20px;letter-spacing:1px;margin-bottom:4px}
 .psc-meta{font-size:12px;color:var(--muted)}
+.home-plan{display:flex;align-items:center;gap:12px}
+.hp-go{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#0d0d0f;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.home-stats{display:flex;gap:8px;margin-bottom:4px}
+.hs-box{flex:1;background:var(--surface);border:1px solid #2a2a33;border-radius:var(--radius);padding:12px 14px;min-width:0}
+.hs-val{font-family:var(--font-display);font-size:24px;letter-spacing:1px;color:var(--accent);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hs-lbl{font-size:12px;color:var(--muted);margin-top:2px}
 /* History detail */
 .h-card{cursor:pointer;transition:border-color .15s}
 .h-card:active{border-color:var(--accent)}
-.h-card-arrow{color:var(--muted);font-size:18px;float:right;margin-top:-2px}
 .hd-ex-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #222}
 .hd-ex-row:last-child{border-bottom:none}
 .hd-ex-icon{font-size:18px;width:30px;flex-shrink:0}
@@ -415,6 +454,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 .hd-ex-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hd-ex-meta{font-size:11px;color:var(--muted);margin-top:1px}
 .hd-ex-status{font-size:18px;flex-shrink:0}
+.hd-delta{font-weight:600;color:var(--accent);margin-left:4px}
+.hd-delta.down{color:var(--muted)}
 /* Active workout banner */
 .workout-active-banner{background:linear-gradient(135deg,rgba(200,241,53,.12),rgba(139,187,26,.08));border:1.5px solid var(--accent);border-radius:var(--radius);padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:14px}
 .wab-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:pulse 1.4s infinite}
@@ -463,7 +504,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
     <button class="back-btn" onclick="goBack()">‹</button>
     <div style="flex:1;min-width:0"><div class="detail-title" id="d-name"></div><div class="detail-sub" id="d-muscle"></div></div>
   </div>
-  <div class="info-grid" id="d-info"></div>
+  <div id="d-info"></div>
   <div class="note-box" id="d-note" style="display:none"></div>
   <div class="last-time" id="d-last" style="display:none"></div>
   <div class="sec-label" id="lbl-sets-timer"></div>
@@ -521,12 +562,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
     <div class="sec-label" data-i="section.workout"></div>
     <div class="card" style="padding:12px 16px">
       <button class="btn-outline" id="btn-new-workout" onclick="newWorkout()"></button>
-      <button class="btn-danger" id="btn-reset-all" onclick="confirmResetAll()"></button>
     </div>
     <div class="sec-label" id="sec-install" style="display:none"></div>
     <div class="card" id="install-card" style="display:none;padding:12px 16px">
       <button class="btn-outline" id="btn-install" onclick="doInstall()"></button>
       <div class="g-sub" id="install-hint" style="margin-top:8px"></div>
+    </div>
+    <div class="sec-label" data-i="section.danger"></div>
+    <div class="card" style="padding:12px 16px">
+      <button class="btn-danger" id="btn-reset-all" style="margin-top:0" onclick="confirmResetAll()"></button>
+      <div class="g-sub" style="margin-top:8px" data-i="danger.hint"></div>
     </div>
     <div class="app-version" id="app-version"></div>
   </div>
@@ -535,7 +580,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 <div id="screen-plan-detail" class="screen">
   <div class="detail-header">
     <button class="back-btn" onclick="showScreen('settings');showSettingsTab('plans')">‹</button>
-    <div style="flex:1;min-width:0"><div class="detail-title" id="pd-name"></div><div class="detail-sub" id="pd-meta"></div></div>
+    <div style="flex:1;min-width:0"><div class="detail-title"><span id="pd-name"></span><button class="pd-rename" id="pd-rename" onclick="openRenamePlan(editingPlanId)">✏️</button></div><div class="detail-sub" id="pd-meta"></div></div>
   </div>
   <div class="stabs">
     <button class="stab active" onclick="showPlanTab('phases')" data-i="tab.phases"></button>
@@ -561,16 +606,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 
 </div><!-- /#app-scroll -->
 
-<!-- MODAL: SELECT PLAN TO START -->
-<div class="modal-overlay" id="modalSelectPlan">
-  <div class="modal">
-    <div class="modal-title" id="msp-title"></div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" id="msp-sub"></p>
-    <div id="plan-select-list"></div>
-    <div class="m-cancel" onclick="closeModal('modalSelectPlan')" data-i="btn.cancel"></div>
-  </div>
-</div>
-
 <!-- PAUSE TIMER -->
 <div class="timer-overlay" id="timerOverlay">
   <div class="tov-lbl" id="tov-lbl"></div>
@@ -579,9 +614,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
       <circle class="tov-bg" cx="90" cy="90" r="80"/>
       <circle class="tov-bar" id="tovBar" cx="90" cy="90" r="80" stroke-dasharray="502.65" stroke-dashoffset="0"/>
     </svg>
-    <div class="tov-num" id="tovNum">75</div>
+    <div class="tov-num" id="tovNum"></div>
   </div>
-  <div class="tov-next" id="tovNext"></div>
+  <div><div class="tov-next" id="tovNext"></div><div class="tov-target" id="tovTarget"></div></div>
   <div class="tov-adjust">
     <button class="tov-step" id="tov-less" onclick="adjustRest(-30)">−30s</button>
     <button class="tov-step" id="tov-more" onclick="adjustRest(30)">+30s</button>
@@ -630,11 +665,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
     <div id="gex-reps-fields">
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl" data-i="field.reps"></div><input class="s-inp" id="gex-reps" type="text" placeholder="8-12"></div>
-        <div class="s-row"><div class="s-lbl" data-i="field.sets"></div><input class="s-inp" id="gex-sets" type="number" min="1" max="20" placeholder="3"></div>
+        <div class="s-row"><div class="s-lbl" data-i="field.sets"></div><input class="s-inp" id="gex-sets" type="number" inputmode="numeric" min="1" max="20" placeholder="3"></div>
       </div>
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl" data-i="field.seatheight"></div><input class="s-inp" id="gex-sitz" type="text"></div>
-        <div class="s-row"><div class="s-lbl" data-i="field.weight"></div><input class="s-inp" id="gex-kg" type="text"></div>
+        <div class="s-row"><div class="s-lbl" data-i="field.weight"></div><input class="s-inp" id="gex-kg" type="text" inputmode="decimal"></div>
       </div>
       <div class="s-row"><div class="s-lbl" data-i="field.pause"></div><button class="dur-field" id="gex-pause" onclick="durFieldOpen('gex-pause',t('field.pause'),true,state.globalPauseSecs)"></button></div>
     </div>
@@ -741,9 +776,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
 </div>
 
 <div class="bottom-nav">
-  <button class="nav-btn active" id="nav-workout" onclick="showScreen('workout')"><span>🏋️</span><span data-i="nav.workout"></span></button>
-  <button class="nav-btn" id="nav-settings" onclick="showScreen('settings')"><span>⚙️</span><span data-i="nav.settings"></span></button>
-  <button class="nav-btn" id="nav-history" onclick="showScreen('history')"><span>📋</span><span data-i="nav.history"></span></button>
+  <button class="nav-btn active" id="nav-workout" onclick="showScreen('workout')"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg><span data-i="nav.workout"></span></button>
+  <button class="nav-btn" id="nav-settings" onclick="showScreen('settings')"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span data-i="nav.settings"></span></button>
+  <button class="nav-btn" id="nav-history" onclick="showScreen('history')"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span data-i="nav.history"></span></button>
 </div>
 
 <!-- jsQR 1.4.0 - https://github.com/cozmo/jsQR - Apache License 2.0.
@@ -834,7 +869,7 @@ const T = {
     'adjust.hint':'Gilt nur für dieses Training. Dein Plan bleibt unverändert.',
     'adjust.plan':'Plan:','adjust.active':'Heute angepasst – Plan unverändert',
     'set.undo.hint':'Tippen zum Zurücknehmen',
-    'edit':'✏️ Bearbeiten','rename':'Umbenennen',
+    'rename':'Umbenennen',
     'phases':'Phasen','exercises':'Übungen','exercises.abbr':'Übg.','add-phase':'+ PHASE HINZUFÜGEN','add-ex':'+ ÜBUNG HINZUFÜGEN',
     'no-phase':'Keine Phase','no-gex':'Noch keine globalen Übungen definiert.',
     'no-history':'Noch kein Training abgeschlossen.',
@@ -848,8 +883,8 @@ const T = {
     'timer.start':'START','timer.pause':'PAUSE','timer.resume':'WEITER',
     'timer.again':'NOCHMAL','timer.finished':'FERTIG!',
     'sw.start':'Start','sw.stop':'Stopp',
-    'without-phase':'Weitere Übungen','without-phase-lbl':'Ohne Phase',
-    'phase':'Phase','type.time.abbr':'⏱ Zeit','type.reps.abbr':'💪 Kraft',
+    'without-phase':'Weitere Übungen',
+    'type.time.abbr':'⏱ Zeit','type.reps.abbr':'💪 Kraft',
     'edit.note':'Bearbeiten','mce.desc':'Änderungen gelten nur für diesen Plan.',
     'mce.new':'NEUE ÜBUNG ERSTELLEN',
     'confirm.new-workout':'Trainingsfortschritt zuruecksetzen?',
@@ -862,23 +897,28 @@ const T = {
     'import.error':'Ungültige Datei.',
     'import.confirm.fewer':'Diese Datei enthält weniger Workouts als die App.\n\nIn der App: {n}\nIn der Datei: {m}\n\nDer Import ersetzt deinen Verlauf durch den aus der Datei. Workouts, die dort fehlen, gehen verloren. Trotzdem importieren?',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
-    'history.time':'Uhrzeit','history.sets':'Sätze',
+    'history.sets':'Sätze',
     'plan.empty':'Neuer leerer Plan','plan.copy':'Kopie',
     'btn.plan-empty':'Leeren Plan erstellen','btn.plan-copy':'Plan kopieren',
     'modal.copy-source':'WELCHEN PLAN KOPIEREN?','modal.copy-source.sub':'Wähle den Plan der kopiert werden soll:',
-    'workout.home.title':'BEREIT ZUM TRAINIEREN','workout.home.sub':'Wähle einen Plan und starte dein Workout.',
     'workout.noplan.title':'NOCH KEIN PLAN','workout.noplan.sub':'Lege deinen ersten Trainingsplan an, dann kann es losgehen.',
     'workout.noplan.cta':'ERSTEN PLAN ANLEGEN',
-    'workout.home.title.active':'TRAINING PAUSIERT','workout.home.sub.active':'Du hast ein Training begonnen. Möchtest du weitermachen?',
-    'workout.start':'TRAINING STARTEN','workout.select.title':'PLAN AUSWÄHLEN','workout.select.sub':'Mit welchem Plan möchtest du trainieren?',
-    'history.detail.exercises':'ÜBUNGEN','history.detail.plan':'Plan',
+    
+    'history.detail.exercises':'Übungen',
     'history.delete':'Dieses Training löschen',
+    'section.danger':'GEFAHRENBEREICH',
+    'danger.hint':'Löscht alle Pläne und deinen ganzen Verlauf auf diesem Gerät. Exportiere vorher, wenn du eine Kopie behalten willst.',
+    'home.start':'Training starten','home.thisweek':'diese Woche','home.lastworkout':'letztes Training',
+    'home.last':'zuletzt {when}','home.never':'noch nicht trainiert','home.paused':'pausiert',
+    'workouts.one':'1 Training','workouts.many':'{n} Trainings',
+    'history.week.this':'Diese Woche','history.week.last':'Letzte Woche','history.week.of':'Woche ab {d}','history.earlier':'Früher',
+    'history.duration':'Dauer','history.bests':'Neue Bestwerte',
+    'sw.show':'Stoppuhr',
     'confirm.history-delete':'Dieses Training aus dem Verlauf löschen? Das lässt sich nicht rückgängig machen.',
     'workout.active.banner.title':'TRAINING LÄUFT',
     'workout.active.resume':'FORTSETZEN','workout.finish':'TRAINING ABSCHLIESSEN',
     'workout.end.confirm':'Training wirklich beenden? Der Fortschritt wird im Verlauf gespeichert.',
     'workout.end.paused.confirm':'Das pausierte Training beenden? Es wird im Verlauf gespeichert.',
-    'workout.end.new':'Neues Training starten',
     'workout.abort':'Training abbrechen','workout.abort.confirm':'Training wirklich abbrechen? Fortschritt geht verloren.',
     'next.exercise':'Nächste Übung',
     'timer.done.notification':'Zeit abgelaufen – Übung jetzt abschließen!',
@@ -930,7 +970,7 @@ const T = {
     'adjust.hint':'Applies to this session only. Your plan stays unchanged.',
     'adjust.plan':'Plan:','adjust.active':'Adjusted for today – plan unchanged',
     'set.undo.hint':'Tap to undo',
-    'edit':'✏️ Edit','rename':'Rename',
+    'rename':'Rename',
     'phases':'Phases','exercises':'Exercises','exercises.abbr':'ex.','add-phase':'+ ADD PHASE','add-ex':'+ ADD EXERCISE',
     'no-phase':'No phase','no-gex':'No global exercises defined yet.',
     'no-history':'No workout completed yet.',
@@ -944,8 +984,8 @@ const T = {
     'timer.start':'START','timer.pause':'PAUSE','timer.resume':'RESUME',
     'timer.again':'AGAIN','timer.finished':'DONE!',
     'sw.start':'Start','sw.stop':'Stop',
-    'without-phase':'More exercises','without-phase-lbl':'No phase',
-    'phase':'Phase','type.time.abbr':'⏱ Time','type.reps.abbr':'💪 Strength',
+    'without-phase':'More exercises',
+    'type.time.abbr':'⏱ Time','type.reps.abbr':'💪 Strength',
     'edit.note':'Edit','mce.desc':'Changes only apply to this plan.',
     'mce.new':'CREATE NEW EXERCISE',
     'confirm.new-workout':'Reset workout progress?',
@@ -958,23 +998,28 @@ const T = {
     'import.error':'Invalid file.',
     'import.confirm.fewer':'This file has fewer workouts than this app.\n\nIn this app: {n}\nIn the file: {m}\n\nImporting replaces your history with the one in the file. Workouts missing from it are lost. Import anyway?',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
-    'history.time':'Time','history.sets':'Sets',
+    'history.sets':'Sets',
     'plan.empty':'New empty plan','plan.copy':'Copy',
     'btn.plan-empty':'Create empty plan','btn.plan-copy':'Copy a plan',
     'modal.copy-source':'WHICH PLAN TO COPY?','modal.copy-source.sub':'Select the plan you want to copy:',
-    'workout.home.title':'READY TO TRAIN','workout.home.sub':'Choose a plan and start your workout.',
     'workout.noplan.title':'NO PLAN YET','workout.noplan.sub':'Create your first training plan and you are ready to go.',
     'workout.noplan.cta':'CREATE YOUR FIRST PLAN',
-    'workout.home.title.active':'WORKOUT PAUSED','workout.home.sub.active':'You have a workout in progress. Want to continue?',
-    'workout.start':'START WORKOUT','workout.select.title':'SELECT PLAN','workout.select.sub':'Which plan do you want to train with?',
-    'history.detail.exercises':'EXERCISES','history.detail.plan':'Plan',
+    
+    'history.detail.exercises':'Exercises',
     'history.delete':'Delete this workout',
+    'section.danger':'DANGER ZONE',
+    'danger.hint':'Deletes every plan and your whole history on this device. Export first if you want to keep a copy.',
+    'home.start':'Start a workout','home.thisweek':'this week','home.lastworkout':'last workout',
+    'home.last':'last done {when}','home.never':'not done yet','home.paused':'paused',
+    'workouts.one':'1 workout','workouts.many':'{n} workouts',
+    'history.week.this':'This week','history.week.last':'Last week','history.week.of':'Week of {d}','history.earlier':'Earlier',
+    'history.duration':'Duration','history.bests':'New bests',
+    'sw.show':'Stopwatch',
     'confirm.history-delete':'Delete this workout from your history? This cannot be undone.',
     'workout.active.banner.title':'WORKOUT IN PROGRESS',
     'workout.active.resume':'RESUME','workout.finish':'FINISH WORKOUT',
     'workout.end.confirm':'Really finish workout? Progress will be saved to history.',
     'workout.end.paused.confirm':'End the paused workout? It will be saved to history.',
-    'workout.end.new':'Start new workout',
     'workout.abort':'Abort workout','workout.abort.confirm':'Really abort workout? Progress will be lost.',
     'next.exercise':'Next exercise',
     'timer.done.notification':'Time is up – complete the exercise now!',
@@ -1362,13 +1407,53 @@ function getProg(planId){
 }
 function emptyProgress(){ return {completedSets:{},doneExercises:[],overrides:{}}; }
 function getSets(exId){ return getProg(state.activePlanId).completedSets[exId]||0; }
-function setSets(exId,n){ getProg(state.activePlanId).completedSets[exId]=n; }
+function setSets(exId,n){ if(n>0) markStarted(); getProg(state.activePlanId).completedSets[exId]=n; }
 function isDone(exId){ return getProg(state.activePlanId).doneExercises.includes(exId); }
-function setDone(exId){ const p=getProg(state.activePlanId); if(!p.doneExercises.includes(exId)) p.doneExercises.push(exId); }
+function setDone(exId){ markStarted(); const p=getProg(state.activePlanId); if(!p.doneExercises.includes(exId)) p.doneExercises.push(exId); }
+// A session starts with its first ticked set or exercise, not when the plan is
+// opened: a plan left open on the phone for an hour before anything happens is
+// not an hour's workout. saveHistory turns it into the entry's startTs, which
+// History shows as the duration. Date.now, not new Date(), so the tests' clock
+// reaches it.
+function markStarted(){
+  const p=getProg(state.activePlanId);
+  if(!p.startedAt) p.startedAt=new Date(Date.now()).toISOString();
+}
 function unsetDone(exId){ const p=getProg(state.activePlanId); p.doneExercises=p.doneExercises.filter(x=>x!==exId); }
 function pauseFor(ex){ return (ex.pauseSecs!=null&&ex.pauseSecs!=='')? parseInt(ex.pauseSecs):state.globalPauseSecs; }
 function fmtTime(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function fmtDur(secs){ return fmtTime(Math.max(0,Math.round(Number(secs)||0))); }
+// "yesterday", "4 days ago", "2 weeks ago", in the app's language. Counted in
+// calendar days, so last night's workout reads "yesterday" the next morning
+// even though fewer than 24 hours have passed. Older than two months it is a
+// date again, where "9 weeks ago" stops being quicker to read.
+function relDay(ts){
+  const d=new Date(ts); if(!ts||isNaN(d.getTime())) return '';
+  const midnight=x=>{ const c=new Date(x); c.setHours(0,0,0,0); return c.getTime(); };
+  // Rounded, because a day across a DST change is 23 or 25 hours long.
+  const days=Math.round((midnight(Date.now())-midnight(d))/86400000);
+  if(days<0||days>=60) return d.toLocaleDateString(historyLocale());
+  const rtf=new Intl.RelativeTimeFormat(historyLocale(),{numeric:'auto'});
+  return days<14 ? rtf.format(-days,'day') : rtf.format(-Math.floor(days/7),'week');
+}
+// Local midnight on the Monday of the week holding d.
+function weekStart(d){
+  const c=new Date(d); c.setHours(0,0,0,0);
+  c.setDate(c.getDate()-((c.getDay()+6)%7));
+  return c;
+}
+function entryWhen(e){ const d=new Date(e&&e.ts); return isNaN(d.getTime())?null:d; }
+// Minutes from the first ticked set to Finish, or null for entries recorded
+// before startTs existed. A span over a day is a clock that was wrong, not a
+// workout, and is not shown.
+function entryMinutes(e){
+  const a=new Date(e&&e.startTs), b=entryWhen(e);
+  if(!b||isNaN(a.getTime())) return null;
+  const m=Math.round((b-a)/60000);
+  return m>=0&&m<24*60 ? m : null;
+}
+function fmtMinutes(m){ return m<60 ? m+' min' : Math.floor(m/60)+' h '+String(m%60).padStart(2,'0')+' min'; }
+function workoutsCount(n){ return n===1?t('workouts.one'):t('workouts.many').replace('{n}',n); }
 // Text going into a value="" attribute has to have its quotes escaped, or a
 // name like  Core "hard"  closes the attribute early and everything after the
 // quote is dropped -- silently, and only when the field is next opened and
@@ -1535,12 +1620,14 @@ function showSettingsTab(tab){
 function updateHeader(){
   document.getElementById('h-plan-name').textContent = 'GOTRAIN';
   document.getElementById('h-sub').textContent = '';
+  document.querySelector('.prw').style.visibility = 'hidden';
   syncHeaderOffset();
 }
 
 function setWorkoutHeader(planName){
   document.getElementById('h-plan-name').textContent = planName.toUpperCase();
   document.getElementById('h-sub').textContent = '🟢 ' + t('workout.active.banner.title');
+  document.querySelector('.prw').style.visibility = '';
   syncHeaderOffset();
 }
 
@@ -1562,6 +1649,9 @@ function renderWorkout(){
   else renderWorkoutActive();
 }
 
+// The home screen starts a workout in one tap: every plan is a card, with when
+// it was last trained. It used to be a single button opening a plan picker,
+// around a screen that was otherwise empty.
 function renderWorkoutHome(){
   if(!hasPlan()){ renderNoPlan(); return; }
   const prog = getProg(state.activePlanId);
@@ -1569,9 +1659,6 @@ function renderWorkoutHome(){
   const plan = activePlan();
   const done = prog.doneExercises.length, total = plan.exercises.length;
   const pct = total ? Math.round(done/total*100) : 0;
-
-  const homeTitle = hasProgress ? t('workout.home.title.active') : t('workout.home.title');
-  const homeSub   = hasProgress ? t('workout.home.sub.active')   : t('workout.home.sub');
 
   let bannerHTML = '';
   if(hasProgress){
@@ -1585,17 +1672,46 @@ function renderWorkoutHome(){
     </div>`;
   }
 
-  document.getElementById('workout-content').innerHTML=`
-    ${bannerHTML}
-    <div class="workout-home">
-      <div>
-        <div class="workout-home-icon">${hasProgress ? '⏸️' : '🏋️'}</div>
-        <div class="workout-home-title">${homeTitle}</div>
-        <div class="workout-home-sub" style="margin:8px auto 0">${homeSub}</div>
-      </div>
-      <button class="btn-primary" style="max-width:300px" onclick="openPlanSelectModal()">${hasProgress ? t('workout.end.new') : t('workout.start')}</button>
+  // Every card goes through startNewWithPlan, which asks before ending a paused
+  // session (B-28) -- the paused plan's own card included, which is how it is
+  // started afresh. Resuming is the banner's job.
+  const cards = state.plans.map(p=>{
+    const paused = hasProgress && p.id===state.activePlanId;
+    const last = lastWorkoutOf(p);
+    const meta = [p.exercises.length+' '+t('exercises'),
+      paused ? t('home.paused') : last ? t('home.last').replace('{when}',relDay(last.ts)) : t('home.never')];
+    return `<div class="plan-select-card home-plan" data-plan="${p.id}" onclick="startNewWithPlan('${p.id}')">
+      <div style="flex:1;min-width:0"><div class="psc-name">${escHtml(p.name)}</div><div class="psc-meta">${escHtml(meta.join(' · '))}</div></div>
+      <div class="hp-go">▶</div>
     </div>`;
+  }).join('');
+
+  document.getElementById('workout-content').innerHTML=
+    bannerHTML + homeStatsHTML() + `<div class="sec-label">${t('home.start')}</div>` + cards;
   updateProgress();
+}
+
+// The newest history entry for a plan. Entries from before planId was stored
+// are matched by name.
+function lastWorkoutOf(plan){
+  let best=null;
+  (state.history||[]).forEach(e=>{
+    if(e.planId!==plan.id&&!(e.planId==null&&e.plan===plan.name)) return;
+    const d=entryWhen(e); if(d&&(!best||d>entryWhen(best))) best=e;
+  });
+  return best;
+}
+
+function homeStatsHTML(){
+  const dated=(state.history||[]).map(entryWhen).filter(Boolean);
+  if(!dated.length) return '';
+  const week=weekStart(Date.now()).getTime();
+  const thisWeek=dated.filter(d=>d.getTime()>=week).length;
+  const last=new Date(Math.max(...dated.map(d=>d.getTime())));
+  return `<div class="home-stats">
+    <div class="hs-box"><div class="hs-val">${thisWeek}</div><div class="hs-lbl">${t('home.thisweek')}</div></div>
+    <div class="hs-box"><div class="hs-val">${escHtml(relDay(last.toISOString()))}</div><div class="hs-lbl">${t('home.lastworkout')}</div></div>
+  </div>`;
 }
 
 function renderNoPlan(){
@@ -1614,22 +1730,28 @@ function renderNoPlan(){
 function renderWorkoutActive(){
   const plan=activePlan();
   setWorkoutHeader(plan.name); // Show plan name in header while workout is active
-  let h=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-    <button onclick="abortWorkout()" style="background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer">✕ ${t('workout.abort')}</button>
-  </div>`;
+  let h='';
   plan.phases.forEach((phase,pi)=>{
     const exs=plan.exercises.filter(e=>e.phaseId===phase.id); if(!exs.length) return;
-    h+=`<div class="phase-card pc-${pi%PHASE_COLORS}"><div class="phase-label pt-${pi%PHASE_COLORS}">${t('phase')} ${pi+1}</div><div class="phase-title">${escHtml(phase.name)}</div></div>`;
+    h+=phaseHeadHTML(escHtml(phase.name),'pt-'+(pi%PHASE_COLORS),exs);
     exs.forEach(ex=>{ h+=exItemHTML(ex); });
   });
   const unphased=plan.exercises.filter(e=>!e.phaseId||!plan.phases.find(ph=>ph.id===e.phaseId));
   if(unphased.length){
-    h+=`<div class="phase-card" style="background:var(--surface)"><div class="phase-label">${t('without-phase-lbl')}</div><div class="phase-title">${t('without-phase')}</div></div>`;
+    h+=phaseHeadHTML(t('without-phase'),'',unphased);
     unphased.forEach(ex=>{ h+=exItemHTML(ex); });
   }
   h+=`<button class="finish-workout-btn" onclick="finishWorkout()">🏁 ${t('workout.finish')}</button>`;
+  // At the bottom, under Finish: it throws the session away, and at the top it
+  // was the first thing on the screen.
+  h+=`<button class="btn-text-danger" onclick="abortWorkout()">✕ ${t('workout.abort')}</button>`;
   document.getElementById('workout-content').innerHTML=h;
   updateProgress();
+}
+// name arrives escaped: a phase name is user text, the no-phase label is not.
+function phaseHeadHTML(name,cls,exs){
+  const done=exs.filter(e=>isDone(e.id)).length;
+  return `<div class="phase-head"><span class="${cls}">${name}</span><span class="ph-count">${done}/${exs.length}</span></div>`;
 }
 
 function abortWorkout(){
@@ -1644,7 +1766,6 @@ function abortWorkout(){
 }
 
 function startWithPlan(planId){
-  closeModal('modalSelectPlan');
   state.activePlanId = planId; saveState();
   workoutMode = 'active';
   onWorkoutStarted();
@@ -1680,24 +1801,6 @@ function finishWorkout(){
   workoutMode='home';
   renderWorkout();
   appScroll().scrollTo(0,0);
-}
-
-function openPlanSelectModal(){
-  document.getElementById('msp-title').textContent = t('workout.select.title');
-  document.getElementById('msp-sub').textContent = t('workout.select.sub');
-  const list = document.getElementById('plan-select-list');
-  list.innerHTML = state.plans.map(p=>{
-    const prog = getProg(p.id);
-    const hasProgress = prog.doneExercises.length > 0 || Object.values(prog.completedSets).some(v=>v>0);
-    const done = prog.doneExercises.length, total = p.exercises.length;
-    const pct = total ? Math.round(done/total*100) : 0;
-    const isCurrentActive = workoutMode==='active' && p.id===state.activePlanId;
-    return `<div class="plan-select-card ${isCurrentActive?'selected':''}" onclick="startNewWithPlan('${p.id}')">
-      <div class="psc-name">${isCurrentActive?'▶ ':''} ${escHtml(p.name)}</div>
-      <div class="psc-meta">${p.phases.length} ${t('phases')} · ${total} ${t('exercises')}${hasProgress?' · '+pct+'% '+t('done').replace('✓ ',''):''}</div>
-    </div>`;
-  }).join('');
-  openModal('modalSelectPlan');
 }
 
 function exItemHTML(planExercise){
@@ -1738,17 +1841,9 @@ function openDetail(exId){
   currentExId=exId; const ex=getEx(exId);
   document.getElementById('d-name').textContent=ex.name;
   document.getElementById('d-muscle').textContent=muscleLabel(ex.muscle)+' – '+(ex.type==='time'?t('time-ex'):t('strength-ex'));
-  const grid=document.getElementById('d-info');
-  if(ex.type==='time'){
-    grid.innerHTML=`<div class="info-box" style="grid-column:1/-1"><div class="ib-label">${t('field.duration')}</div><div class="ib-val">${fmtDur(exDurSecs(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
-  } else {
-    let h=`<div class="info-box"><div class="ib-label">${t('field.reps')}</div><div class="ib-val">${escHtml(ex.reps||'–')}</div><div class="ib-sub">${t('reps.abbr')}</div></div>
-      <div class="info-box"><div class="ib-label">${t('field.sets')}</div><div class="ib-val">${escHtml(ex.sets)}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>`;
-    if(ex.sithoehe) h+=`<div class="info-box"><div class="ib-label">${t('field.seatheight')}</div><div class="ib-val">${escHtml(ex.sithoehe)}</div><div class="ib-sub">${t('seatheight.abbr')}</div></div>`;
-    if(ex.kg) h+=`<div class="info-box"><div class="ib-label">${t('field.weight')}</div><div class="ib-val">${escHtml(ex.kg)}</div><div class="ib-sub">kg</div></div>`;
-    h+=`<div class="info-box"><div class="ib-label">${t('gs.pause.lbl')}</div><div class="ib-val">${fmtDur(pauseFor(ex))}</div><div class="ib-sub">${t('unit.min')}</div></div>`;
-    grid.innerHTML=h;
-  }
+  // A timed exercise's length is on its timer just below, so it has no summary.
+  const sum=document.getElementById('d-info');
+  sum.innerHTML=ex.type==='time'?'':exSummaryHTML(ex);
   renderLastTime(ex);
   renderSetsLabel();
   const noteEl=document.getElementById('d-note');
@@ -1921,6 +2016,44 @@ function renderSetsLabel(){
   el.textContent = ex&&ex.type!=='time' ? t('field.sets') : t('timer');
 }
 
+// Sets × reps and the weight on one line, rest and seat under it. A weight that
+// is a plain number gets a ±2.5 kg stepper; anything else ("BW", "2x10") is
+// shown as written and changed through Adjust for today as before.
+function exSummaryHTML(ex){
+  const sub=[t('field.pause')+' '+fmtDur(pauseFor(ex))];
+  if(ex.sithoehe) sub.push(escHtml(t('seatheight.abbr')+' '+ex.sithoehe));
+  const n=kgNumber(ex.kg);
+  const step=d=>n==null?'':`<button class="kg-step" onclick="stepKg(${d})">${d<0?'\u2212':'+'}${fmtKg(KG_STEP,ex.kg)}</button>`;
+  const kg=ex.kg?`<div class="es-kg">${step(-1)}<div class="es-kg-val">${escHtml(ex.kg)}<small> kg</small></div>${step(1)}</div>`:'';
+  return `<div class="ex-sum"><div class="es-row"><div class="es-main">${escHtml(ex.sets)} \u00d7 ${escHtml(ex.reps||'\u2013')}</div>${kg}</div>
+    <div class="es-sub">${sub.join(' \u00b7 ')}</div></div>`;
+}
+
+const KG_STEP=2.5;
+// The weight as a number, accepting a decimal comma, or null when it is not a
+// plain number.
+function kgNumber(v){
+  const s=String(v==null?'':v).trim().replace(',','.');
+  return /^\d+(\.\d+)?$/.test(s) ? parseFloat(s) : null;
+}
+// Written back the way the weight was typed: 62,5 stays with a comma.
+function fmtKg(n,like){
+  const s=String(Math.round(n*100)/100);
+  return String(like==null?'':like).indexOf(',')>=0 ? s.replace('.',',') : s;
+}
+// The stepper writes the same per-session override as Adjust for today, so the
+// plan keeps its weight, History records today's, and stepping back to the
+// plan's own number removes the override instead of storing a copy of it.
+function stepKg(dir){
+  const exId=currentExId, base=planEx(exId), ex=getEx(exId); if(!base||!ex) return;
+  const now=kgNumber(ex.kg); if(now==null) return;
+  const next=Math.max(0,Math.round((now+dir*KG_STEP)*100)/100);
+  const prog=getProg(state.activePlanId), o=Object.assign({},prog.overrides[exId]||{});
+  if(kgNumber(base.kg)===next) delete o.kg; else o.kg=fmtKg(next,ex.kg);
+  if(Object.keys(o).length) prog.overrides[exId]=o; else delete prog.overrides[exId];
+  saveState(); openDetail(exId);
+}
+
 function renderLastTime(ex){
   const box=document.getElementById('d-last'); if(!box) return;
   const prev=lastSessionFor(ex);
@@ -1933,7 +2066,7 @@ function renderLastTime(ex){
     const sets=row.setsCompleted||row.sets;
     if(sets) bits.push(escHtml(String(sets))+(row.reps?'\u00d7'+escHtml(row.reps):''));
   }
-  bits.push(escHtml(entryDate(prev.entry)));
+  bits.push(escHtml(relDay(prev.entry.ts)||entryDate(prev.entry)));
   box.innerHTML=`<span class="lt-label">${t('lasttime')}</span>`
     + bits.map(b=>`<span class="lt-val">${b}</span>`).join('<span>\u00b7</span>')
     + (isPersonalBest(ex)?`<span class="lt-best">\u2605 ${t('personalbest')}</span>`:'');
@@ -2004,14 +2137,17 @@ function renderSetRows(ex){
         <div class="sr-num">${i}</div>
         <div><div class="sr-label">${t('set')} ${i} · ${escHtml(ex.reps||'–')} ${t('reps.abbr')}${kg}</div>
           ${ex.sithoehe?`<div class="sr-sub">${t('seatheight.abbr')} ${escHtml(ex.sithoehe)}</div>`:''}
-          ${!iDone?`<div class="sw-wrap">
+          ${!iDone?`<div class="sw-wrap${swInUse(swKey(ex.id,i))?'':' off'}" id="sw-w-${ex.id}-${i}">
             <span class="sw-time" id="sw-t-${ex.id}-${i}">0:00</span>
             <button class="sw-btn" id="sw-b-${ex.id}-${i}" onclick="event.stopPropagation();swToggle('${ex.id}',${i})">▶ ${t('sw.start')}</button>
             <button class="sw-btn" onclick="event.stopPropagation();swReset('${ex.id}',${i})">↺</button>
           </div>`:`<div class="sr-sub" style="color:var(--done-border)">✓ ${t('done').replace('✓ ','')}</div>`}
         </div>
       </div>
-      <div class="chk" style="cursor:${isLocked?'default':'pointer'}">${iDone?'✓':(isNext?'▶':'○')}</div>
+      <div class="sr-right">
+        ${!iDone?`<button class="sw-show${swInUse(swKey(ex.id,i))?' off':''}" id="sw-s-${ex.id}-${i}" title="${t('sw.show')}" aria-label="${t('sw.show')}" onclick="event.stopPropagation();swToggle('${ex.id}',${i})"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2.5 1.5M9.5 2.5h5M12 2.5V6"/></svg></button>`:''}
+        <div class="chk" style="cursor:${isLocked?'default':'pointer'}">${iDone?'✓':(isNext?'▶':'○')}</div>
+      </div>
     </div>`;
   }
   cont.innerHTML=h;
@@ -2123,12 +2259,12 @@ function showNextExerciseBanner(nextExId){
   const nextPhase = plan.phases.find(ph=>ph.id===nextEx.phaseId);
   const isDifferentPhase = nextPhase && (!currentPhase || currentPhase.id !== nextPhase.id);
   const phaseLabel = isDifferentPhase
-    ? `<div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px">📍 ${escHtml(nextPhase.name)}</div>`
+    ? `<div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px">📍 ${escHtml(nextPhase.name)}</div>`
     : '';
 
   slot.innerHTML = `<div style="background:rgba(200,241,53,.1);border:1.5px solid var(--accent);border-radius:var(--radius);padding:16px;margin-top:12px;display:flex;align-items:center;gap:14px;cursor:pointer" onclick="openDetail('${nextExId}')">
     <div style="flex:1;min-width:0">
-      <div style="font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:3px">${t('next.exercise')}</div>
+      <div style="font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:3px">${t('next.exercise')}</div>
       ${phaseLabel}
       <div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(nextEx.icon)} ${escHtml(nextEx.name)}</div>
       <div style="font-size:12px;color:var(--muted);margin-top:2px">${escHtml(muscleLabel(nextEx.muscle))} · ${escHtml(metaStr(nextEx))}</div>
@@ -2235,7 +2371,7 @@ function renderRestTimer(){
   if(rem>0){
     ov.classList.add('active');
     const num=document.getElementById('tovNum'), bar=document.getElementById('tovBar');
-    if(num) num.textContent=Math.ceil(rem);
+    if(num) num.textContent=fmtTime(Math.ceil(rem));
     if(bar) bar.style.strokeDashoffset=circ*(1-rem/r.total);
     renderRestNext(r);
     return;
@@ -2254,6 +2390,14 @@ function renderRestNext(r){
   const html=(ex&&r.set>=1&&r.set<=n)?`${t('set')} <strong>${escHtml(r.set)}/${escHtml(n)}</strong>`:'';
   // The ticker calls this four times a second; only touch the DOM on change.
   if(el.innerHTML!==html) el.innerHTML=html;
+  // What that set asks for, read live like the line above, so a weight
+  // stepped up during the rest shows here at once.
+  const tgt=document.getElementById('tovTarget'); if(!tgt) return;
+  const bits=[];
+  if(html&&ex.reps) bits.push(ex.reps+' '+t('reps.abbr'));
+  if(html&&ex.kg) bits.push(ex.kg+' kg');
+  const txt=bits.join(' \u00b7 ');
+  if(tgt.textContent!==txt) tgt.textContent=txt;
 }
 
 // ── a timed exercise's countdown ───────────────────────────────────────
@@ -2313,7 +2457,7 @@ function renderExTimer(){
   disp.className='et-disp'+(running?' running':'');
   if(bar){ bar.style.width=Math.max(0,left/total*100)+'%'; bar.className='et-bar'+(running?' running':''); }
   if(btn){
-    btn.textContent=running?('⏸ '+t('timer.pause'))
+    btn.textContent=running?('❚❚ '+t('timer.pause'))
                            :('▶ '+(left<total?t('timer.resume'):t('timer.start')));
     btn.className='et-btn '+(running?'stop':'start');
   }
@@ -2341,14 +2485,20 @@ function swStopAll(){
   });
   saveTimers(); renderStopwatches();
 }
+// Has this set's stopwatch been used? Until it has, only its small start
+// button shows.
+function swInUse(k){ const sw=timers.sw[k]; return !!(sw&&(sw.startedAt||sw.acc>0)); }
 function renderStopwatches(){
   Object.keys(timers.sw).forEach(k=>{
+    const used=swInUse(k);
+    document.getElementById('sw-w-'+k)?.classList.toggle('off',!used);
+    document.getElementById('sw-s-'+k)?.classList.toggle('off',used);
     const el=document.getElementById('sw-t-'+k);
     if(el) el.textContent=fmtTime(Math.floor(swElapsed(k)));
     const btn=document.getElementById('sw-b-'+k);
     if(btn){
       const on=!!(timers.sw[k]&&timers.sw[k].startedAt);
-      btn.textContent=(on?'⏸ ':'▶ ')+t(on?'sw.stop':'sw.start');
+      btn.textContent=(on?'❚❚ ':'▶ ')+t(on?'sw.stop':'sw.start');
       btn.className='sw-btn'+(on?' active':'');
     }
   });
@@ -2363,14 +2513,15 @@ function renderSettings(){ showSettingsTab('plans'); }
 // ══════════════════════════════════════════════
 function renderPlansList(){
   document.getElementById('plans-list').innerHTML=state.plans.map(p=>{
-    return `<div class="card">
-      <div class="card-header"><div class="card-name">${escHtml(p.name)}</div></div>
-      <div class="card-meta">${p.phases.length} ${t('phases')} · ${p.exercises.length} ${t('exercises')}</div>
-      <div class="card-btns">
-        <button class="c-btn edit" onclick="openPlanDetail('${p.id}')">${t('edit')}</button>
-        <button class="c-btn edit" onclick="openRenamePlan('${p.id}')">${t('rename')}</button>
-        ${state.plans.length>1?`<button class="c-btn del" onclick="deletePlanById('${p.id}')">✕</button>`:''}
+    // The card opens the editor, where the plan is renamed. Delete stays apart
+    // from it, and no longer sits right next to Rename.
+    return `<div class="card plan-card" onclick="openPlanDetail('${p.id}')">
+      <div style="flex:1;min-width:0">
+        <div class="card-name">${escHtml(p.name)}</div>
+        <div class="card-meta">${p.phases.length} ${t('phases')} · ${p.exercises.length} ${t('exercises')}</div>
       </div>
+      ${state.plans.length>1?`<button class="c-btn del" onclick="event.stopPropagation();deletePlanById('${p.id}')">✕</button>`:''}
+      <div class="ex-arrow">›</div>
     </div>`;
   }).join('');
 }
@@ -2382,6 +2533,7 @@ let editingPlanId=null;
 function openPlanDetail(planId){
   editingPlanId=planId; const plan=getPlanById(planId);
   document.getElementById('pd-name').textContent=plan.name;
+  document.getElementById('pd-rename').title=t('rename');
   document.getElementById('pd-meta').textContent=plan.phases.length+' '+t('phases')+' · '+plan.exercises.length+' '+t('exercises');
   showPlanTab('phases');
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
@@ -2531,7 +2683,6 @@ function renderPlanExercises(){
   const plan=getPlanById(editingPlanId), cont=document.getElementById('ptab-exercises'); let h='';
   plan.exercises.forEach(ex=>{
     const phase=plan.phases.find(ph=>ph.id===ex.phaseId);
-    const phaseOpts=plan.phases.map(ph=>`<option value="${ph.id}" ${ex.phaseId===ph.id?'selected':''}>${escHtml(ph.name)}</option>`).join('')+`<option value="" ${!ex.phaseId?'selected':''}>${t('no-phase')}</option>`;
     h+=`<div class="plan-ex-row" id="per-${ex.id}">
       <div class="drag-handle" id="dh-${ex.id}">⠿</div>
       <div class="plan-ex-info">
@@ -2539,7 +2690,6 @@ function renderPlanExercises(){
         <div class="plan-ex-meta">${escHtml(muscleLabel(ex.muscle))}${phase?' · '+escHtml(phase.name):''} · ${escHtml(metaStr(ex))}</div>
       </div>
       <div class="plan-ex-btns">
-        <select class="pe-select" onchange="changeExPhase('${ex.id}',this.value)">${phaseOpts}</select>
         <button class="pe-btn" onclick="openEditPlanEx('${ex.id}')">✏️</button>
         <button class="pe-btn danger" onclick="deletePlanEx('${ex.id}')">✕</button>
       </div>
@@ -2607,7 +2757,6 @@ function doReorder(srcId,tgtId){
   saveState(); renderPlanExercises();
 }
 
-function changeExPhase(exId,phaseId){ const plan=getPlanById(editingPlanId),ex=plan.exercises.find(e=>e.id===exId); if(ex){ex.phaseId=phaseId||null;saveState();} }
 function deletePlanEx(exId){
   if(!confirm(t('confirm.del-ex')))return;
   const plan=getPlanById(editingPlanId);
@@ -2672,7 +2821,7 @@ function renderGexList(){
       <div class="gex-header" onclick="toggleGex('${gex.id}')">
         <div class="gex-title"><span>${escHtml(gex.icon)}</span><span>${escHtml(gex.name)}</span><span style="font-size:11px;color:var(--muted);font-weight:400">${escHtml(muscleLabel(gex.muscle))}</span></div>
         <div style="display:flex;align-items:center;gap:4px">
-          <span style="font-size:10px;color:var(--muted)">${gex.type==='time'?t('type.time.abbr'):t('type.reps.abbr')}</span>
+          <span style="font-size:11px;color:var(--muted)">${gex.type==='time'?t('type.time.abbr'):t('type.reps.abbr')}</span>
           <button class="del-btn" onclick="event.stopPropagation();deleteGex('${gex.id}')">✕</button>
           <div class="gex-arrow">›</div>
         </div>
@@ -2814,11 +2963,11 @@ function openCustomizeExModal(data,btnLabel,isNew){
     <div id="mce-reps-fields" style="${curType==='time'?'display:none':''}">
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl">${t('field.reps')}</div><input class="s-inp" id="mce-reps" value="${escAttr(data.reps||'')}"></div>
-        <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" min="1" max="20" value="${escAttr(data.sets||3)}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" inputmode="numeric" min="1" max="20" value="${escAttr(data.sets||3)}"></div>
       </div>
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl">${t('field.seatheight')}</div><input class="s-inp" id="mce-sitz" value="${escAttr(data.sithoehe||'')}"></div>
-        <div class="s-row"><div class="s-lbl">${t('field.weight')}</div><input class="s-inp" id="mce-kg" value="${escAttr(data.kg||'')}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.weight')}</div><input class="s-inp" id="mce-kg" inputmode="decimal" value="${escAttr(data.kg||'')}"></div>
       </div>
       <div class="s-row"><div class="s-lbl">${t('field.pause')}</div><button class="dur-field" id="mce-pause" onclick="durFieldOpen('mce-pause',t('field.pause'),true,state.globalPauseSecs)"></button></div>
     </div>
@@ -2938,7 +3087,8 @@ function closeCopySourceModal(){
   openModal('modalAddPlan');
 }
 function openRenamePlan(planId){ renamingPlanId=planId; document.getElementById('renamePlanInput').value=state.plans.find(p=>p.id===planId)?.name||''; openModal('modalRenamePlan'); }
-function confirmRenamePlan(){ const name=document.getElementById('renamePlanInput').value.trim(); if(name){const p=state.plans.find(p=>p.id===renamingPlanId);if(p)p.name=name;} saveState();closeModal('modalRenamePlan');renderPlanSwitcher();renderPlansList(); }
+function confirmRenamePlan(){ const name=document.getElementById('renamePlanInput').value.trim(); if(name){const p=state.plans.find(p=>p.id===renamingPlanId);if(p)p.name=name;} saveState();closeModal('modalRenamePlan');renderPlanSwitcher();renderPlansList();
+  if(editingPlanId===renamingPlanId){ const p=getPlanById(renamingPlanId); if(p) document.getElementById('pd-name').textContent=p.name; } }
 function deletePlanModal(){ if(removePlan(renamingPlanId)) closeModal('modalRenamePlan'); }
 function deletePlanById(planId){ removePlan(planId); }
 // The timers, the wake lock and workoutMode all belong to the active plan's
@@ -3264,9 +3414,12 @@ function saveHistory(){
   });
   const totalSets=Object.values(prog.completedSets).reduce((a,b)=>a+b,0);
   const doneCount=prog.doneExercises.length;
-  const now=new Date();
+  const now=new Date(Date.now());
   state.history.unshift({
     id:uid(),
+    // When the first set was ticked (markStarted). Absent on a session where
+    // nothing was, and on every entry recorded before it existed.
+    ...(prog.startedAt?{startTs:prog.startedAt}:{}),
     // ts is canonical; date/time are display strings kept for older readers.
     ts:now.toISOString(),
     date:now.toLocaleDateString(historyLocale()),
@@ -3287,13 +3440,29 @@ function renderHistory(){
   let h='';
   if(allDone) h+=`<div class="congrats"><div class="big">🏆</div><h2>${t('congrats.title')}</h2><p>${t('congrats.sub')}</p></div>`;
   if(!state.history.length&&!allDone){cont.innerHTML=h+`<div class="empty-state"><div class="big">📋</div>${t('no-history')}</div>`;return;}
+  // Grouped under week headings, newest first as stored. An entry without a
+  // usable ts (recorded before it existed) goes under "Earlier".
+  const weekOf=e=>{ const d=entryWhen(e); return d?weekStart(d).getTime():null; };
+  const perWeek={};
+  state.history.forEach(e=>{ const k=weekOf(e); perWeek[k]=(perWeek[k]||0)+1; });
+  const thisWeek=weekStart(Date.now()).getTime();
+  const lastWeek=weekStart(thisWeek-86400000).getTime();
+  let shown;
   state.history.forEach((entry,i)=>{
-    const pct=entry.totalExercises?Math.round(entry.doneExercises/entry.totalExercises*100):0;
+    const wk=weekOf(entry);
+    if(i===0||wk!==shown){
+      shown=wk;
+      const label=wk==null?t('history.earlier'):wk===thisWeek?t('history.week.this'):wk===lastWeek?t('history.week.last')
+        :t('history.week.of').replace('{d}',new Date(wk).toLocaleDateString(historyLocale(),{day:'numeric',month:'short'}));
+      h+=`<div class="h-week"><span>${escHtml(label)}</span><span>${escHtml(workoutsCount(perWeek[wk]))}</span></div>`;
+    }
+    const d=entryWhen(entry), mins=entryMinutes(entry);
+    const day=d?d.toLocaleDateString(historyLocale(),{weekday:'short',day:'numeric',month:'short'}):entryDate(entry);
+    const sub=[day,entryTime(entry)].concat(mins!=null?[fmtMinutes(mins)]:[]).filter(Boolean);
     h+=`<div class="h-card" onclick="openHistoryDetail(${i})">
-      <div class="h-title">${escHtml(entry.plan)} · ${escHtml(entryDate(entry))} <span class="h-card-arrow">›</span></div>
-      <div class="h-row"><span>${t('history.time')}</span><span class="h-val">${escHtml(entryTime(entry))}</span></div>
-      <div class="h-row"><span>${t('history.detail.exercises')}</span><span class="h-val">${escHtml(entry.doneExercises||0)}/${escHtml(entry.totalExercises||0)}</span></div>
-      <div class="h-row"><span>${t('history.sets')}</span><span class="h-val">${escHtml(entry.totalSets||0)}</span></div>
+      <div class="hc-main"><div class="hc-plan">${escHtml(entry.plan)}</div><div class="hc-sub">${escHtml(sub.join(' · '))}</div></div>
+      <div class="hc-stat">${escHtml(entry.doneExercises||0)}/${escHtml(entry.totalExercises||0)}<div class="hc-sets">${escHtml(entry.totalSets||0)} ${t('history.sets')}</div></div>
+      <div class="ex-arrow">›</div>
     </div>`;
   });
   cont.innerHTML=h;
@@ -3309,24 +3478,53 @@ function openHistoryDetail(i){
   document.getElementById('hd-sub').textContent=entryDate(entry)+' · '+entryTime(entry);
   // Info boxes
   const pct=entry.totalExercises?Math.round((entry.doneExercises||0)/entry.totalExercises*100):0;
+  // The time and the plan are in the heading already; these boxes carry what
+  // it does not: how long it took and what it beat.
+  const notes=(entry.exercises||[]).map(row=>historyRowNote(i,row));
+  const bests=notes.filter(n=>n.best).length, mins=entryMinutes(entry);
   document.getElementById('hd-info').innerHTML=`
     <div class="info-box"><div class="ib-label">${t('history.detail.exercises')}</div><div class="ib-val">${escHtml(entry.doneExercises||0)}/${escHtml(entry.totalExercises||0)}</div><div class="ib-sub">${pct}%</div></div>
     <div class="info-box"><div class="ib-label">${t('history.sets')}</div><div class="ib-val">${escHtml(entry.totalSets||0)}</div><div class="ib-sub">${t('field.sets').toLowerCase()}</div></div>
-    <div class="info-box"><div class="ib-label">${t('history.time')}</div><div class="ib-val">${escHtml(entryTime(entry))}</div><div class="ib-sub">${escHtml(entryDate(entry))}</div></div>
-    <div class="info-box"><div class="ib-label">${t('history.detail.plan')}</div><div class="ib-val" style="font-size:14px;margin-top:4px">${escHtml(entry.plan)}</div><div class="ib-sub">&nbsp;</div></div>`;
+    ${mins!=null?`<div class="info-box"><div class="ib-label">${t('history.duration')}</div><div class="ib-val">${fmtMinutes(mins)}</div><div class="ib-sub">&nbsp;</div></div>`:''}
+    <div class="info-box"><div class="ib-label">${t('history.bests')}</div><div class="ib-val">${bests?'★ '+bests:'–'}</div><div class="ib-sub">&nbsp;</div></div>`;
   // Exercise list
   const exList=entry.exercises||[];
-  document.getElementById('hd-exercises').innerHTML=exList.map(ex=>{
+  document.getElementById('hd-exercises').innerHTML=exList.map((ex,ri)=>{
     const statusIcon=ex.done?'✅':'⬜';
     const meta=ex.type==='time'?(ex.durationSecs!=null?fmtDur(ex.durationSecs)+' '+t('unit.min'):(ex.durationMin||'?')+' '+t('unit.min')):(ex.setsCompleted||0)+'/'+ex.sets+' '+t('field.sets').toLowerCase()+(ex.reps?' · '+ex.reps+' '+t('reps.abbr'):'')+(ex.kg?' · '+ex.kg+'kg':'');
     return `<div class="hd-ex-row">
       <div class="hd-ex-icon">${escHtml(ex.icon)}</div>
-      <div class="hd-ex-info"><div class="hd-ex-name">${escHtml(ex.name)}</div><div class="hd-ex-meta">${escHtml(muscleLabel(ex.muscle))} · ${escHtml(meta)}</div></div>
+      <div class="hd-ex-info"><div class="hd-ex-name">${escHtml(ex.name)}</div><div class="hd-ex-meta">${escHtml(muscleLabel(ex.muscle))} · ${escHtml(meta)}${notes[ri].html}</div></div>
       <div class="hd-ex-status">${statusIcon}</div>
     </div>`;
   }).join('');
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-history-detail').classList.add('active');
+}
+
+// How one exercise in history entry i compares with the sessions before it:
+// the change in weight since the last time it was done, and a star when it was
+// heavier than every earlier time. Older entries sit later in the list. Same
+// matching as "Last time": by id, or by name for a renamed copy.
+function historyRowNote(i,row){
+  const none={html:'',best:false};
+  const kg=kgNumber(row&&row.kg);
+  if(kg==null||!rowWasDone(row)) return none;
+  const name=String(row.name||'').trim().toLowerCase();
+  let prev=null, best=null;
+  state.history.slice(i+1).forEach(e=>(e.exercises||[]).forEach(r=>{
+    if(!rowWasDone(r)) return;
+    if(r.id!==row.id&&!(name&&String(r.name||'').trim().toLowerCase()===name)) return;
+    const v=kgNumber(r.kg); if(v==null) return;
+    if(prev==null) prev=v;
+    best=best==null?v:Math.max(best,v);
+  }));
+  if(prev==null) return none;
+  const d=Math.round((kg-prev)*100)/100, isBest=kg>best;
+  let html='';
+  if(d) html+=` <span class="hd-delta${d<0?' down':''}">${d>0?'+':'−'}${escHtml(fmtKg(Math.abs(d),row.kg))} kg</span>`;
+  if(isBest) html+=` <span class="hd-delta">★</span>`;
+  return {html, best:isBest};
 }
 
 // Removes the entry on screen by identity, not by id: an imported history may

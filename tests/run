@@ -279,9 +279,9 @@ def test_timers_survive_a_locked_screen():
       w.playBeep=()=>{}; w.vibrate=()=>{};
       w.startWithPlan('p1'); w.openDetail('x1');
       w.startPauseTimer(75);
-      ok('rest shows its full length', d.getElementById('tovNum').textContent, 75);
+      ok('rest shows its full length', d.getElementById('tovNum').textContent, '1:15');
       off=40000; w.tickAll();
-      ok('rest catches up after 40s away', d.getElementById('tovNum').textContent, 35);
+      ok('rest catches up after 40s away', d.getElementById('tovNum').textContent, '0:35');
       off=80000; w.tickAll();
       ok('rest closes once elapsed', d.getElementById('timerOverlay').classList.contains('active'), false);
       off=0; w.openDetail('x2');
@@ -480,8 +480,8 @@ def test_imported_fields_cannot_inject_markup():
       ok('history list: no field became an element', leaked(), '');
       w.openHistoryDetail(0);
       ok('history detail: no field became an element', leaked(), '');
-      ok('history detail shows the plan name literally',
-         d.querySelector('#hd-info').textContent.indexOf('<img src=x data-f=plan>') >= 0, true);
+      ok('history list shows the plan name literally',
+         d.querySelector('#history-content .hc-plan').textContent, '<img src=x data-f=plan>');
     """
     report(drive(evil, body), "field escaping")
 
@@ -828,7 +828,8 @@ def test_a_skipped_exercise_is_not_last_time():
       const st=w.eval('state');
       ok('the untouched session is not reported', txt.indexOf('80 kg'), -1);
       ok('the last session actually done is', txt.indexOf('57,5 kg') >= 0, true);
-      ok('with its own date', txt.indexOf(w.entryDate(st.history[1])) >= 0, true);
+      ok('with its own date', txt.indexOf(w.relDay(st.history[1].ts)) >= 0, true);
+      ok('not the skipped one', txt.indexOf(w.relDay(st.history[0].ts)), -1);
       ok('and its sets', txt.indexOf('3\u00d78') >= 0, true);
       ok('60 kg is a new best over 57,5', txt.indexOf('\u2605') >= 0, true);
     """
@@ -889,13 +890,13 @@ def test_rest_can_be_adjusted_while_running():
       w.startWithPlan('p1'); w.openDetail('x1');
       w.startPauseTimer(75);
       w.adjustRest(30);
-      ok('+30 adds to the remaining time', num(), 105);
+      ok('+30 adds to the remaining time', num(), '1:45');
       w.adjustRest(-30); w.adjustRest(-30);
-      ok('-30 takes it away', num(), 45);
+      ok('-30 takes it away', num(), '0:45');
 
       // The deadline moved, not a counter, so it still catches up after a lock.
       off=20000; w.tickAll();
-      ok('an adjusted rest still follows the clock', num(), 25);
+      ok('an adjusted rest still follows the clock', num(), '0:25');
 
       w.adjustRest(-30);
       ok('shortening past zero ends the rest', up(), false);
@@ -1264,9 +1265,8 @@ def test_starting_new_ends_a_paused_workout():
       const S=()=>w.eval('state'), M=()=>w.eval('workoutMode');
       const realConfirm=w.confirm; let asked=0, answer=false;
       w.confirm=()=>{ asked++; return answer; };
-      const startNew=()=>d.querySelector('.workout-home .btn-primary').click();
-      const pick=id=>[...d.querySelectorAll('#plan-select-list .plan-select-card')]
-        .find(c=>c.getAttribute('onclick').indexOf("'"+id+"'")>=0).click();
+      const startNew=()=>{};
+      const pick=id=>d.querySelector('.home-plan[data-plan="'+id+'"]').click();
       ok('it comes back paused', d.querySelector('.workout-active-banner')!==null, true);
 
       // Cancelling changes nothing.
@@ -1278,7 +1278,7 @@ def test_starting_new_ends_a_paused_workout():
       ok('cancel: nothing went to history', S().history.length, 0);
 
       // The resume banner still resumes, without asking.
-      w.closeModal('modalSelectPlan'); asked=0;
+      asked=0;
       d.querySelector('.workout-active-banner .wab-btn').click();
       ok('resume: no question', asked, 0);
       ok('resume: the sets are still ticked', w.getSets('x1'), 2);
@@ -1595,7 +1595,7 @@ def test_the_rest_remembers_which_set_it_leads_to():
             try{
               const d3=f.contentDocument, w3=f.contentWindow;
               ok('an old rest record is restored', d3.getElementById('timerOverlay').classList.contains('active'), true);
-              ok('it still counts', Number(d3.getElementById('tovNum').textContent)>0, true);
+              ok('it still counts', /^0:[0-5]\d$/.test(d3.getElementById('tovNum').textContent) && d3.getElementById('tovNum').textContent!=='0:00', true);
               ok('it shows no line', d3.getElementById('tovNext').textContent, '');
               ok('and the app came up whole', !!d3.getElementById('screen-workout'), true);
             }catch(e){ out.push('FAIL|old record check threw|'+e.message+'|-'); }
@@ -1800,6 +1800,206 @@ def test_one_history_entry_can_be_deleted():
       ok('after: 62 kg is a new best again', txt.indexOf('★') >= 0, true);
     """
     report(drive(wrong, body3), "delete history entry feeds last time")
+
+
+def test_the_weight_steps_on_the_exercise_screen():
+    print("\nweight stepper and rest target (browser)")
+    if not browser():
+        skip("weight stepper", "no chromium found")
+        return
+    # The exercise screen's summary steps the weight by 2.5 kg. It writes the
+    # same per-session override as Adjust for today: the plan keeps 60, History
+    # gets today's, and stepping back to 60 removes the override.
+    body = """
+      w.confirm=()=>true; w.playBeep=()=>{}; w.vibrate=()=>{};
+      const S=()=>w.eval('state');
+      const steps=()=>d.querySelectorAll('#d-info .kg-step');
+      const kg=()=>d.querySelector('#d-info .es-kg-val').textContent;
+      w.startWithPlan('p1'); w.openDetail('x1');
+      ok('the summary reads sets x reps', d.querySelector('#d-info .es-main').textContent, '3 \\u00d7 8');
+      ok('it names the rest', d.querySelector('#d-info .es-sub').textContent.indexOf('1:15') >= 0, true);
+      ok('a plain weight gets two steppers', steps().length, 2);
+      steps()[1].click();
+      ok('+ adds 2.5 kg', kg(), '62.5 kg');
+      ok('as an override for today', S().progress.p1.overrides.x1.kg, '62.5');
+      ok('the plan keeps its weight', S().plans[0].exercises[0].kg, '60');
+      ok('the set rows follow', d.querySelector('#d-sets .wbadge').textContent, '62.5 kg');
+      steps()[0].click();
+      ok('back to the plan weight drops the override', JSON.stringify(S().progress.p1.overrides), '{}');
+      steps()[0].click();
+      ok('- takes 2.5 kg off', kg(), '57.5 kg');
+
+      // The rest says what the next set asks for, in m:ss.
+      w.completeSet('x1',1); w.tickAll();
+      ok('the rest names the next set', d.getElementById('tovNext').textContent, 'Set 2/3');
+      ok('and its target', d.getElementById('tovTarget').textContent, '8 reps \\u00b7 57.5 kg');
+      w.clearRestTimer();
+
+      w.finishWorkout();
+      ok('history records the stepped weight', S().history[0].exercises[0].kg, '57.5');
+
+      w.startWithPlan('p1'); w.openDetail('x2');
+      ok('a timed exercise has no summary', d.getElementById('d-info').innerHTML, '');
+    """
+    report(drive(DEMO, body), "weight stepper")
+
+    odd = json.loads(json.dumps(DEMO))
+    odd["plans"][0]["exercises"][0]["kg"] = "61,25"
+    odd["plans"][0]["exercises"].append(dict(odd["plans"][0]["exercises"][0], id="x3", name="Dips", kg="BW"))
+    body2 = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      d.querySelectorAll('#d-info .kg-step')[1].click();
+      ok('a decimal comma is kept', w.eval('state').progress.p1.overrides.x1.kg, '63,75');
+      w.openDetail('x3');
+      ok('a weight that is not a number gets no stepper', d.querySelectorAll('#d-info .kg-step').length, 0);
+      ok('and is shown as written', d.querySelector('#d-info .es-kg-val').textContent, 'BW kg');
+    """
+    report(drive(odd, body2), "weight stepper, unusual weights")
+
+
+def test_a_finished_session_records_how_long_it_took():
+    print("\nworkout duration (browser)")
+    if not browser():
+        skip("workout duration", "no chromium found")
+        return
+    # The session starts with its first ticked set, not when the plan is
+    # opened, and History shows the span to Finish.
+    body = """
+      const REAL=Date.parse('2026-10-28T17:00:00Z'); let off=0;
+      w.Date.now=()=>REAL+off; w.confirm=()=>true; w.playBeep=()=>{}; w.vibrate=()=>{};
+      const S=()=>w.eval('state');
+      w.startWithPlan('p1');
+      off=20*60000;
+      ok('opening the plan does not start the clock', S().progress.p1.startedAt, undefined);
+      w.completeSet('x1',1); w.clearRestTimer();
+      ok('the first set does', S().progress.p1.startedAt, new Date(REAL+20*60000).toISOString());
+      off=70*60000;
+      w.finishWorkout();
+      const h=S().history[0];
+      ok('the entry carries its start', h.startTs, new Date(REAL+20*60000).toISOString());
+      ok('fifty minutes, set to finish', w.entryMinutes(h), 50);
+      w.showScreen('history');
+      ok('the history row shows it', d.querySelector('.h-card .hc-sub').textContent.indexOf('50 min') >= 0, true);
+      w.openHistoryDetail(0);
+      ok('so does the detail', d.getElementById('hd-info').textContent.indexOf('50 min') >= 0, true);
+
+      w.startWithPlan('p1'); w.finishWorkout();
+      ok('a session with nothing ticked has no start', 'startTs' in S().history[0], false);
+      w.openHistoryDetail(0);
+      ok('and no duration box', d.getElementById('hd-info').textContent.indexOf('Duration'), -1);
+      ok('an hour and more reads in hours', w.fmtMinutes(65), '1 h 05 min');
+    """
+    report(drive(DEMO, body), "workout duration")
+
+
+def test_history_is_grouped_by_week_and_names_what_improved():
+    print("\nhistory weeks, changes and bests (browser)")
+    if not browser():
+        skip("history weeks", "no chromium found")
+        return
+    s1 = _session("h1", "2026-10-07T17:00:00Z", "55")
+    s1["startTs"] = "2026-10-07T16:10:00Z"
+    st = _with_history([_session("h4", "2026-10-27T17:00:00Z", "62.5"),
+                        _session("h3", "2026-10-26T17:00:00Z", "60"),
+                        _session("h2", "2026-10-21T17:00:00Z", "60"),
+                        s1])
+    body = """
+      w.Date.now=()=>Date.parse('2026-10-28T12:00:00Z');
+      w.showScreen('history');
+      const heads=[...d.querySelectorAll('#history-content .h-week')].map(h=>h.textContent).join('|');
+      ok('three week headings with counts', heads, 'This week2 workouts|Last week1 workout|Week of Oct 51 workout');
+      ok('every workout is a row', d.querySelectorAll('#history-content .h-card').length, 4);
+      ok('the row with a start shows its duration',
+         d.querySelectorAll('#history-content .h-card')[3].textContent.indexOf('50 min') >= 0, true);
+
+      const meta=()=>d.querySelector('#hd-exercises .hd-ex-meta').innerHTML;
+      const box=()=>d.getElementById('hd-info').textContent;
+      w.openHistoryDetail(0);
+      ok('62.5 after 60 is +2.5 kg', meta().indexOf('+2.5 kg') >= 0, true);
+      ok('and a new best', meta().indexOf('\\u2605') >= 0, true);
+      ok('the bests box counts it', box().indexOf('\\u2605 1') >= 0, true);
+      w.openHistoryDetail(1);
+      ok('the same weight shows no change', meta().indexOf('kg</span>'), -1);
+      ok('and is not a best when it only matches one', meta().indexOf('\\u2605'), -1);
+      ok('the bests box says none', box().indexOf('\\u2013') >= 0, true);
+      w.openHistoryDetail(3);
+      ok('the first session has nothing to compare with', meta().indexOf('hd-delta'), -1);
+      ok('time and plan are no longer repeated in the boxes', box().indexOf('Plan'), -1);
+
+      // Relative dates, in the app's language.
+      ok('today', w.relDay('2026-10-28T08:00:00Z'), 'today');
+      ok('yesterday', w.relDay('2026-10-27T18:00:00Z'), 'yesterday');
+      ok('days', w.relDay('2026-10-24T12:00:00Z'), '4 days ago');
+      ok('weeks after a fortnight', w.relDay('2026-10-14T12:00:00Z'), '2 weeks ago');
+      ok('a date after two months', w.relDay('2026-08-01T12:00:00Z'), new Date('2026-08-01T12:00:00Z').toLocaleDateString('en-US'));
+      ok('nothing for no date', w.relDay(undefined), '');
+      w.changeLang('de');
+      ok('German', w.relDay('2026-10-24T12:00:00Z'), 'vor 4 Tagen');
+    """
+    report(drive(st, body), "history weeks")
+
+
+def test_the_home_screen_starts_a_plan_in_one_tap():
+    print("\nhome screen and header ring (browser)")
+    if not browser():
+        skip("home screen", "no chromium found")
+        return
+    st = _with_history([_session("h1", "2026-10-27T17:00:00Z", "60")])
+    p2 = json.loads(json.dumps(DEMO["plans"][0]))
+    p2["id"], p2["name"] = "p2", "Legs"
+    st["plans"].append(p2)
+    body = """
+      w.Date.now=()=>Date.parse('2026-10-28T12:00:00Z');
+      const ring=()=>d.querySelector('.prw').style.visibility;
+      w.showScreen('workout');
+      const card=id=>d.querySelector('.home-plan[data-plan="'+id+'"]');
+      ok('one card per plan', d.querySelectorAll('.home-plan').length, 2);
+      ok('a trained plan says when', card('p1').textContent.indexOf('last done yesterday') >= 0, true);
+      ok('an untrained one says so', card('p2').textContent.indexOf('not done yet') >= 0, true);
+      ok('the week so far', d.querySelector('.home-stats .hs-val').textContent, '1');
+      ok('no ring without a workout', ring(), 'hidden');
+      card('p2').click();
+      ok('one tap starts it', w.eval('state').activePlanId+'/'+w.eval('workoutMode'), 'p2/active');
+      ok('the ring shows during it', ring(), '');
+      ok('phases are headings with a count', d.querySelector('.phase-head').textContent, 'S0/2');
+      ok('abort sits under finish',
+         d.querySelector('.finish-workout-btn').nextElementSibling.textContent.indexOf('Abort') >= 0, true);
+      w.showScreen('history');
+      ok('no ring on history', ring(), 'hidden');
+    """
+    report(drive(st, body), "home screen")
+
+
+def test_the_quieter_controls():
+    print("\nstopwatch, plan cards and settings layout (browser)")
+    if not browser():
+        skip("quieter controls", "no chromium found")
+        return
+    body = """
+      w.startWithPlan('p1'); w.openDetail('x1');
+      const wrap=()=>d.getElementById('sw-w-x1-1').classList.contains('off');
+      const show=()=>d.getElementById('sw-s-x1-1').classList.contains('off');
+      ok('a set shows no stopwatch until asked', wrap()+'/'+show(), 'true/false');
+      d.getElementById('sw-s-x1-1').click();
+      ok('one tap starts it and shows it', wrap()+'/'+show(), 'false/true');
+      ok('it is running', !!w.eval("timers.sw['x1-1'].startedAt"), true);
+      w.swToggle('x1',1); w.swReset('x1',1);
+      ok('reset tucks it away again', wrap()+'/'+show(), 'true/false');
+
+      w.showScreen('settings'); w.showSettingsTab('plans');
+      d.querySelector('#plans-list .plan-card').click();
+      ok('the plan card opens the editor', d.getElementById('screen-plan-detail').classList.contains('active'), true);
+      w.showPlanTab('exercises');
+      ok('rows carry no phase dropdown', d.querySelectorAll('#ptab-exercises select').length, 0);
+      d.getElementById('pd-rename').click();
+      d.getElementById('renamePlanInput').value='Pull'; w.confirmRenamePlan();
+      ok('renaming in the editor updates its heading', d.getElementById('pd-name').textContent, 'Pull');
+
+      ok('delete all data is not in the workout card',
+         d.getElementById('btn-reset-all').closest('.card')===d.getElementById('btn-new-workout').closest('.card'), false);
+      ok('the library weight brings up the number pad', d.getElementById('gex-kg').inputMode, 'decimal');
+    """
+    report(drive(DEMO, body), "quieter controls")
 
 
 def main():
