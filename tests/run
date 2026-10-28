@@ -658,11 +658,11 @@ def test_changing_sets_keeps_progress_consistent():
       editSets('p1','x1',4);
       ok('adding sets withdraws done', w.isDone('x1'), false);
 
-      // A negative count typed into the plan editor never makes the ticked
-      // sets negative.
+      // A negative count typed into the plan editor is saved as one set
+      // (B-36), so the ticked sets follow it down to one, never below.
       w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2);
       editSets('p1','x1',-1);
-      ok('a negative count leaves no negative ticked sets', w.getSets('x1'), 0);
+      ok('a negative count leaves no negative ticked sets', w.getSets('x1'), 1);
       editSets('p1','x1',4);
 
       // 4. Editing another plan reconciles that plan's paused session and
@@ -682,6 +682,62 @@ def test_changing_sets_keeps_progress_consistent():
       w.confirm=realConfirm;
     """
     report(drive(st, body), "set count")
+
+
+def test_a_typed_set_count_stays_in_range():
+    print("\nset count typed out of range (browser)")
+    if not browser():
+        skip("set count range", "no chromium found")
+        return
+    # The sets fields carry min/max, but a number input accepts whatever is
+    # typed. A stored -2 left the exercise with no set rows to tick, and
+    # Finish wrote it into History.
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{}; w.confirm=()=>true; w.alert=()=>{};
+      const S=()=>w.eval('state');
+      const bench=()=>S().plans[0].exercises.find(e=>e.id==='x1');
+      const planSets=n=>{ w.openPlanDetail('p1'); w.showPlanTab('exercises');
+        w.openEditPlanEx('x1'); d.getElementById('mce-sets').value=String(n); w.savePlanEx();
+        return bench().sets; };
+      const libSets=n=>{ w.openAddGex(); d.getElementById('gex-name').value='Lib'+n;
+        d.getElementById('gex-sets').value=String(n); w.saveGex();
+        return S().globalExercises.find(g=>g.name==='Lib'+n).sets; };
+      const rows=()=>{ w.openDetail('x1'); return d.querySelectorAll('[id^="sr-x1-"]').length; };
+
+      ok('plan editor: -2 is saved as 1', planSets(-2), 1);
+      ok('plan editor: and the exercise has one set row', rows(), 1);
+      ok('plan editor: 0 is saved as the default 3', planSets(0), 3);
+      ok('plan editor: empty is saved as the default 3', planSets(''), 3);
+      ok('plan editor: 25 is saved as 20', planSets(25), 20);
+      ok('plan editor: and the exercise has twenty set rows', rows(), 20);
+      ok('plan editor: 4 is saved as 4', planSets(4), 4);
+      ok('plan editor: and the exercise has four set rows', rows(), 4);
+      ok('plan editor: the field says the same maximum as the library',
+         (w.openEditPlanEx('x1'), d.getElementById('mce-sets').max), '20');
+      w.closeModal('modalCustomizeEx');
+
+      ok('library: -2 is saved as 1', libSets(-2), 1);
+      ok('library: 0 is saved as the default 3', libSets(0), 3);
+      ok('library: 25 is saved as 20', libSets(25), 20);
+      ok('library: 4 is saved as 4', libSets(4), 4);
+
+      // A library exercise picked into a plan goes through the plan editor,
+      // which keeps its count.
+      const g=S().globalExercises.find(x=>x.name==='Lib-2');
+      w.openPlanDetail('p1'); w.showPlanTab('exercises'); w.pickGex(g.id); w.savePlanEx();
+      ok('picked into a plan it keeps 1 set', S().plans[0].exercises.find(e=>e.name==='Lib-2').sets, 1);
+
+      // What Finish writes into History is the clamped count.
+      planSets(-2);
+      w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1); w.finishWorkout();
+      const row=S().history[0].exercises.find(e=>e.id==='x1');
+      ok('history records 1 of 1 sets', row.setsCompleted+'/'+row.sets, '1/1');
+      const kept=JSON.parse(w.localStorage.getItem('tp4_state'));
+      const keptRow=kept.history[0].exercises.find(e=>e.id==='x1');
+      ok('and History was saved with it', keptRow.setsCompleted+'/'+keptRow.sets, '1/1');
+      ok('and so was the plan', kept.plans[0].exercises.find(e=>e.id==='x1').sets, 1);
+    """
+    report(drive(DEMO, body), "set count range")
 
 
 def _with_history(sessions):

@@ -2729,10 +2729,18 @@ function openEditGex(id){
   openModal('modalAddGex');
 }
 
+// The sets fields say min 1 / max 20, but a number input accepts any typed
+// value. A negative count was stored as is and left the exercise with no set
+// rows to tick; empty and 0 keep their old meaning of "the default, 3".
+function parseSetCount(v){
+  const n=parseInt(v,10);
+  return n?Math.min(20,Math.max(1,n)):3;
+}
+
 function saveGex(){
   const name=document.getElementById('gex-name').value.trim(); if(!name){alert(t('alert.no-name'));return;}
   const data={icon:selIconGex,muscle:document.getElementById('gex-muscle').value||'general',name,type:gexType,
-    reps:document.getElementById('gex-reps').value.trim(),sets:parseInt(document.getElementById('gex-sets').value)||3,
+    reps:document.getElementById('gex-reps').value.trim(),sets:parseSetCount(document.getElementById('gex-sets').value),
     sithoehe:document.getElementById('gex-sitz').value.trim(),kg:document.getElementById('gex-kg').value.trim(),
     pauseSecs:durFieldValue('gex-pause'),
     durationSecs:durFieldValue('gex-dur')||300,note:document.getElementById('gex-note').value.trim()};
@@ -2806,7 +2814,7 @@ function openCustomizeExModal(data,btnLabel,isNew){
     <div id="mce-reps-fields" style="${curType==='time'?'display:none':''}">
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl">${t('field.reps')}</div><input class="s-inp" id="mce-reps" value="${escAttr(data.reps||'')}"></div>
-        <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" min="1" value="${escAttr(data.sets||3)}"></div>
+        <div class="s-row"><div class="s-lbl">${t('field.sets')}</div><input class="s-inp" id="mce-sets" type="number" min="1" max="20" value="${escAttr(data.sets||3)}"></div>
       </div>
       <div class="s-row-2">
         <div class="s-row"><div class="s-lbl">${t('field.seatheight')}</div><input class="s-inp" id="mce-sitz" value="${escAttr(data.sithoehe||'')}"></div>
@@ -2841,7 +2849,7 @@ function savePlanEx(){
     name:document.getElementById('mce-name').value.trim()||t('field.name'),
     type:isTime?'time':'reps',
     reps:document.getElementById('mce-reps')?document.getElementById('mce-reps').value.trim():'',
-    sets:parseInt(document.getElementById('mce-sets')?document.getElementById('mce-sets').value:3)||3,
+    sets:parseSetCount(document.getElementById('mce-sets')?document.getElementById('mce-sets').value:3),
     sithoehe:document.getElementById('mce-sitz')?document.getElementById('mce-sitz').value.trim():'',
     kg:document.getElementById('mce-kg')?document.getElementById('mce-kg').value.trim():'',
     pauseSecs:durFieldValue('mce-pause'),
