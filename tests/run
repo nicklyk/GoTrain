@@ -732,7 +732,10 @@ def test_a_typed_set_count_stays_in_range():
       w.startWithPlan('p1'); w.openDetail('x1'); w.completeSet('x1',1); w.finishWorkout();
       const row=S().history[0].exercises.find(e=>e.id==='x1');
       ok('history records 1 of 1 sets', row.setsCompleted+'/'+row.sets, '1/1');
-      ok('and it was saved', JSON.parse(w.localStorage.getItem('tp4_state')).plans[0].exercises[0].sets, 1);
+      const kept=JSON.parse(w.localStorage.getItem('tp4_state'));
+      const keptRow=kept.history[0].exercises.find(e=>e.id==='x1');
+      ok('and History was saved with it', keptRow.setsCompleted+'/'+keptRow.sets, '1/1');
+      ok('and so was the plan', kept.plans[0].exercises.find(e=>e.id==='x1').sets, 1);
     """
     report(drive(DEMO, body), "set count range")
 
