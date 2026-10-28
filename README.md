@@ -8,10 +8,12 @@ unless you choose to move it.
 
 | | | | | |
 |---|---|---|---|---|
-| <img src="screenshot-1.png" width="150" alt="Home screen"> | <img src="screenshot-2.png" width="150" alt="Editing a plan"> | <img src="screenshot-3.png" width="150" alt="Workout history"> | <img src="screenshot-4.png" width="150" alt="Workout paused"> | <img src="screenshot-5.png" width="150" alt="Settings and install"> |
+| <img src="screenshot-1.png" width="150" alt="Home screen"> | <img src="screenshot-2.png" width="150" alt="An exercise during a workout"> | <img src="screenshot-3.png" width="150" alt="Resting between sets"> | <img src="screenshot-4.png" width="150" alt="Workout history"> | <img src="screenshot-5.png" width="150" alt="Editing a plan"> |
 
 ## Features
 
+- **One-tap start** — the home screen lists your plans with when you last
+  trained each, and how many workouts you have done this week
 - **Training plans** — create, copy, rename and delete as many as you like
 - **Phases** — group exercises into colour-coded blocks (Warm Up, Strength, Cool Down…)
 - **Exercise library** — define exercises once with a muscle group and reuse
@@ -19,19 +21,25 @@ unless you choose to move it.
 - **Reps or time** — sets and reps, or a countdown for timed exercises. Each
   timed exercise keeps its own countdown, so moving between two of them in a
   circuit loses no time on either
-- **Live tracking** — tick off sets, rest timer between sets that you can
-  lengthen or shorten while it runs, stopwatch per set
+- **Live tracking** — tick off sets; the exercise, its weight and every set
+  fit on one screen. Step the weight by 2.5 kg right there, for this session
+  only, and the plan keeps its own
+- **Rest timer** — between sets, lengthen or shorten it while it runs, and it
+  shows what the next set asks for. A stopwatch per set is a tap away when you
+  want one
 - **Timers that survive a locked phone** — every timer runs off the clock, so
   locking the screen or switching apps never loses time; come back and it has
   caught up. A rest survives a reload too, still naming the set it leads to.
   The screen stays on during a workout where the browser allows it
 - **Duration wheel** — rest and exercise times are set on a minutes/seconds
   scroll wheel
-- **Last time** — each exercise shows what you lifted in the previous session,
-  and flags it when today's weight would be a new best
-- **History** — every finished session is saved with its full exercise detail.
-  One finished by mistake can be deleted from its detail screen, so it stops
-  feeding *Last time* and your best
+- **Last time** — each exercise shows what you lifted in the previous session
+  and how long ago, and flags it when today's weight would be a new best
+- **History** — every finished session is saved with its full exercise detail,
+  grouped by week, with how long it took (from the first ticked set to
+  Finish), what went up since the time before, and any new bests. One finished
+  by mistake can be deleted from its detail screen, so it stops feeding *Last
+  time* and your best
 - **Progress** — the weight you set per exercise is kept with each session, so
   your load over time is recorded, not just that you turned up
 - **Phone to PC** — scan a pairing code and hand your data to a desktop over
