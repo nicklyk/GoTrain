@@ -1405,6 +1405,47 @@ def test_a_new_plan_does_not_take_over_a_workout():
     report(drive(DEMO, finish), "finish after a new plan")
 
 
+def test_switching_language_keeps_the_header_on_its_screen():
+    print("\nswitching language mid-workout (browser)")
+    if not browser():
+        skip("language switch header", "no chromium found")
+        return
+    # The language select lives on Settings, but changeLang re-rendered the
+    # workout unconditionally, and with a workout running that wrote the
+    # plan name and "training running" into the header over Settings. It
+    # stayed there until the next tab change.
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      const name=()=>d.getElementById('h-plan-name').textContent;
+      const sub=()=>d.getElementById('h-sub').textContent;
+      w.startWithPlan('p1');
+      ok('before: the workout header names the plan', name(), 'PLAN');
+      w.showScreen('settings'); w.showSettingsTab('general');
+      ok('before: Settings shows the plain header', name(), 'GOTRAIN');
+      w.changeLang('de');
+      ok('Settings keeps the plain header', name(), 'GOTRAIN');
+      ok('and an empty sub-line', sub(), '');
+      ok('Settings is still the screen shown',
+         d.getElementById('screen-settings').classList.contains('active'), true);
+      ok('the workout is still running', w.eval('workoutMode'), 'active');
+
+      // Back on the workout (as a resume does), the header is the running
+      // workout's, in the new language.
+      w.showScreen('workout');
+      ok('back on the workout the header names the plan', name(), 'PLAN');
+      ok('in German', sub().endsWith(' '+w.eval("T.de['workout.active.banner.title']")), true);
+
+      // Switching on the workout screen itself still updates it in place.
+      w.changeLang('en');
+      ok('on the workout screen the header updates',
+         sub().endsWith(' '+w.eval("T.en['workout.active.banner.title']")), true);
+      ok('and keeps the plan name', name(), 'PLAN');
+      ok('and the exercise list is in English',
+         d.getElementById('workout-content').textContent.indexOf(w.eval("T.en['workout.finish']")) >= 0, true);
+    """
+    report(drive(DEMO, body), "language switch header")
+
+
 def test_ending_a_workout_leaves_no_timers_behind():
     print("\nreset and new workout clear timers (browser)")
     if not browser():

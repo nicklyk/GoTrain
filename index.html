@@ -1324,7 +1324,10 @@ function applyTranslations(){
 function changeLang(l){
   lang = l; state.lang = l; saveState();
   applyTranslations();
-  renderWorkout();
+  // The select lives on Settings. Re-rendering a running workout from here
+  // writes its plan header over Settings; showScreen('workout') re-renders
+  // it in the new language when the user goes back.
+  if(document.getElementById('screen-workout').classList.contains('active')) renderWorkout();
   if(document.getElementById('stab-plans').classList.contains('active')) renderPlansList();
   if(document.getElementById('stab-globalex').classList.contains('active')) renderGexList();
 }
