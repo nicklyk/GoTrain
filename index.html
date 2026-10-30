@@ -2240,11 +2240,15 @@ function exercisesInDisplayOrder(plan){
   return ordered;
 }
 
+// Looks after the current exercise first, then wraps round to the start: in a
+// gym a machine is often taken, so an exercise skipped earlier is still owed
+// once the last one in the list is finished.
 function findNextExercise(currentExId){
   const plan = activePlan();
   const ordered = exercisesInDisplayOrder(plan);
   const currentIdx = ordered.findIndex(e=>e.id===currentExId);
-  return ordered.slice(currentIdx+1).find(e=>!isDone(e.id)) || null;
+  const wrapped = ordered.slice(currentIdx+1).concat(ordered.slice(0,Math.max(currentIdx,0)));
+  return wrapped.find(e=>!isDone(e.id)) || null;
 }
 function showNextExerciseBanner(nextExId){
   const plan = activePlan();
