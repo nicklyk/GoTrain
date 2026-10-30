@@ -2043,6 +2043,28 @@ def test_the_next_exercise_wraps_to_one_skipped_earlier():
     """ % banner
     report(drive(three, body), "next exercise in order")
 
+    # Looking forward comes first; the wrap is only the fallback. Without this
+    # case "first open exercise from the top" would pass every check above.
+    # Squat sits in its own phase, so the banner must also name the phase it
+    # lands in, in both directions.
+    phased = json.loads(json.dumps(three))
+    phased["plans"][0]["phases"] = [{"id": "ph", "name": "Upper", "colorIdx": 0},
+                                    {"id": "pl", "name": "Lower", "colorIdx": 1}]
+    phased["plans"][0]["exercises"][2]["phaseId"] = "pl"
+    body = """
+      const next=()=>%s;
+      const phase=()=>(d.getElementById('next-ex-slot').textContent.match(/📍 (\\w+)/)||[0,'none'])[1];
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      w.startWithPlan('p1');
+      w.openDetail('x2'); w.completeTimeEx();
+      ok('with Bench skipped, Row points forward to Squat', next(), 'Squat');
+      ok('the banner names the phase it moves into', phase(), 'Lower');
+      w.openDetail('x3'); w.completeSet('x3',1);
+      ok('then it wraps back to Bench', next(), 'Bench');
+      ok('the wrap names the earlier phase', phase(), 'Upper');
+    """ % banner
+    report(drive(phased, body), "next exercise across phases")
+
 
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
