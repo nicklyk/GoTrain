@@ -2002,6 +2002,48 @@ def test_the_quieter_controls():
     report(drive(DEMO, body), "quieter controls")
 
 
+def test_the_next_exercise_wraps_to_one_skipped_earlier():
+    print("\nnext exercise wraps round (browser)")
+    if not browser():
+        skip("next exercise wraps", "no chromium found")
+        return
+    # Going out of order is ordinary when a machine is taken. Finishing the
+    # last exercise in the list must still point back at one left open
+    # earlier, not fall silent.
+    banner = "(d.getElementById('next-ex-slot').textContent.match(/Bench|Row|Squat/)||['none'])[0]"
+    body = """
+      const next=()=>%s;
+      w.startWithPlan('p1');
+      w.openDetail('x2'); w.completeTimeEx();
+      ok('Row done, Bench skipped', w.isDone('x1')+'/'+w.isDone('x2'), 'false/true');
+      ok('finishing the last exercise points back at Bench', next(), 'Bench');
+      const b=d.querySelector('#next-ex-slot > div'); if(b) b.click();
+      ok('tapping it opens Bench', w.eval('currentExId'), 'x1');
+      w.markExDone();
+      ok('with everything done no banner appears', next(), 'none');
+    """ % banner
+    report(drive(DEMO, body), "next exercise wraps")
+
+    three = json.loads(json.dumps(DEMO))
+    three["plans"][0]["exercises"].append(
+        {"id": "x3", "phaseId": "ph", "icon": "3", "name": "Squat", "muscle": "legs",
+         "type": "reps", "sets": 1, "reps": "5", "sithoehe": "", "kg": "80",
+         "pauseSecs": None, "durationSecs": 300, "note": ""})
+    body = """
+      const next=()=>%s;
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      w.startWithPlan('p1');
+      w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2); w.completeSet('x1',3);
+      ok('finishing Bench first still points at Row', next(), 'Row');
+      w.clearRestTimer();
+      w.openDetail('x3'); w.completeSet('x3',1);
+      ok('the wrap goes back to the start of the list', next(), 'Row');
+      w.openDetail('x2'); w.completeTimeEx();
+      ok('the last open exercise leaves no banner', next(), 'none');
+    """ % banner
+    report(drive(three, body), "next exercise in order")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
