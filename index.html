@@ -1269,6 +1269,56 @@ function migrateStale(st){
   return touched>0;
 }
 
+// Set counts saved before parseSetCount existed, or brought in by an import,
+// can be out of range: a plan exercise at -2 opens with no set rows to tick.
+// The editors only fix a count when it is next edited and saved, so this
+// brings every stored count into the editors' range on every start and after
+// every import. Not schema-gated: an import replaces the schema field, and a
+// file that says 4 can still carry -2. Idempotent, so it costs one pass.
+//
+// History is left alone on purpose. It records what was done, and rewriting
+// it is the owner's call, not a migration's.
+//
+// An override follows saveAdjust, not the editors: below 1 means "no change",
+// so it is dropped and the plan's count applies again; above 20 is capped.
+// Called with the live state (load and applyImport both pass it), because
+// clampSets reconciles ticked sets through the global helpers.
+function normaliseSetCounts(st){
+  let touched=0;
+  const fix=list=>(list||[]).forEach(e=>{
+    if(!e) return;
+    const n=parseSetCount(e.sets);
+    if(n!==e.sets){ e.sets=n; touched++; }
+  });
+  (st.plans||[]).forEach(p=>fix(p.exercises));
+  fix(st.globalExercises);
+  Object.keys(st.progress||{}).forEach(planId=>{
+    const prog=st.progress[planId]; if(!prog||!prog.overrides) return;
+    Object.keys(prog.overrides).forEach(exId=>{
+      const o=prog.overrides[exId]; if(!o||o.sets===undefined) return;
+      const n=parseInt(o.sets,10);
+      if(isFinite(n)&&n>=1&&n<=20&&n===o.sets) return;
+      if(!isFinite(n)||n<1) delete o.sets; else o.sets=Math.min(20,n);
+      if(!Object.keys(o).length) delete prog.overrides[exId];
+      touched++;
+    });
+  });
+  // Ticked sets above a repaired count come down to it, through the same
+  // clampSets the editors use. prevMax is the new count, so an exercise done
+  // by hand is never un-marked: no sets were added, a count was repaired.
+  // Only where ticks exceed the count, so a consistent session is not touched.
+  Object.keys(st.progress||{}).forEach(planId=>{
+    const prog=st.progress[planId], plan=(st.plans||[]).find(p=>p&&p.id===planId);
+    if(!prog||!prog.completedSets||!plan) return;
+    (plan.exercises||[]).forEach(e=>{
+      if(!e||e.type==='time') return;
+      const max=setCountOf(e.id,planId);
+      if((prog.completedSets[e.id]||0)>max){ clampSets(e.id,max,planId); touched++; }
+    });
+  });
+  return touched>0;
+}
+
 // ══════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════
@@ -1290,8 +1340,9 @@ function saveState(){ localStorage.setItem('tp4_state', JSON.stringify(state)); 
 
 let state = loadState();
 // Both run: migrateMuscles leaves schema at 2, migrateDurations takes it to 3.
-const _m1=migrateMuscles(state), _m2=migrateDurations(state), _m3=migrateStale(state);
-if(_m1||_m2||_m3) saveState();
+const _m1=migrateMuscles(state), _m2=migrateDurations(state), _m3=migrateStale(state),
+      _m4=normaliseSetCounts(state);
+if(_m1||_m2||_m3||_m4) saveState();
 let lang = state.lang || 'en';
 
 // Locales whose date/time formats the desktop importer can still parse when an
@@ -3210,6 +3261,7 @@ function applyImport(imported){
   migrateMuscles(state);
   migrateDurations(state);
   migrateStale(state);
+  normaliseSetCounts(state);
   lang=state.lang||'en';
   return true;
 }

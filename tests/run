@@ -449,7 +449,7 @@ def test_imported_fields_cannot_inject_markup():
                         "totalExercises": 1, "doneExercises": tag("done"),
                         "totalSets": tag("totalsets"),
                         "exercises": [
-                            {"name": "Bench", "muscle": "chest", "type": "reps", "sets": 3,
+                            {"name": "Bench", "muscle": "chest", "type": "reps", "sets": tag("hsets"),
                              "setsCompleted": 3, "done": True,
                              "reps": tag("hreps"), "kg": tag("hkg")}]}]
     body = """
@@ -471,8 +471,11 @@ def test_imported_fields_cannot_inject_markup():
       ok('plan editor list: no field became an element', leaked(), '');
       w.openEditPlanEx('x3');
       ok('plan exercise editor: no field became an element', leaked(), '');
-      ok('the editor keeps the sets value as typed',
-         d.getElementById('mce-sets').getAttribute('value'), '<img src=x data-f=sets>');
+      // Since B-41 a stored count that is not a number is repaired to the
+      // default at load, so the payload never reaches the editor. History is
+      // not repaired, which is why its row carries a sets payload below.
+      ok('a sets value that is not a number reaches the editor as 3',
+         d.getElementById('mce-sets').getAttribute('value'), '3');
       w.openAddExToPlan();
       ok('add-from-library: no field became an element', leaked(), '');
 
@@ -738,6 +741,80 @@ def test_a_typed_set_count_stays_in_range():
       ok('and so was the plan', kept.plans[0].exercises.find(e=>e.id==='x1').sets, 1);
     """
     report(drive(DEMO, body), "set count range")
+
+
+def test_stored_set_counts_are_brought_into_range():
+    print("\nstored set counts out of range (browser)")
+    if not browser():
+        skip("stored set counts", "no chromium found")
+        return
+    # B-36 fixed a count when it is typed, but one already stored -- saved by
+    # an older build, or brought in by an import -- stayed broken until it was
+    # next edited: an exercise at -2 opened with no set rows to tick.
+    bad = json.loads(json.dumps(DEMO))
+    bad["schema"] = 4    # not schema-gated: an import can say 4 and carry -2
+    ex = bad["plans"][0]["exercises"]
+    ex[0]["sets"] = -2
+    ex.append({"id": "x3", "phaseId": "ph", "icon": "3", "name": "Squat", "muscle": "legs",
+               "type": "reps", "sets": 3, "reps": "5", "sithoehe": "", "kg": "80",
+               "pauseSecs": None, "durationSecs": 300, "note": ""})
+    bad["globalExercises"] = [{"id": "g1", "name": "Big", "type": "reps", "sets": 25},
+                              {"id": "g2", "name": "Odd", "type": "reps", "sets": "abc"},
+                              {"id": "g3", "name": "Fine", "type": "reps", "sets": 4}]
+    bad["progress"] = {"p1": {"completedSets": {"x3": 25}, "doneExercises": ["x1"],
+                              "overrides": {"x1": {"sets": 0, "kg": "70"},
+                                            "x2": {"sets": -1},
+                                            "x3": {"sets": 30}}}}
+    bad["history"] = [{"id": "h1", "ts": "2026-09-01T10:00:00Z", "plan": "Plan",
+                       "exercises": [{"id": "x1", "name": "Bench", "type": "reps",
+                                      "sets": -2, "setsCompleted": 0}]}]
+    checks = """
+      ok(P+'a plan exercise at -2 becomes 1', S.plans[0].exercises[0].sets, 1);
+      ok(P+'an in-range plan exercise keeps its count', S.plans[0].exercises[2].sets, 3);
+      ok(P+'a library exercise at 25 becomes 20', S.globalExercises[0].sets, 20);
+      ok(P+'a library count that is not a number becomes 3', S.globalExercises[1].sets, 3);
+      ok(P+'an in-range library exercise keeps its count', S.globalExercises[2].sets, 4);
+      const ov=S.progress.p1.overrides;
+      ok(P+'an override of 0 is dropped', 'sets' in ov.x1, false);
+      ok(P+'and the rest of that override is kept', ov.x1.kg, '70');
+      ok(P+'an override left empty goes away', 'x2' in ov, false);
+      ok(P+'an override of 30 becomes 20', ov.x3.sets, 20);
+      ok(P+'ticked sets above it come down to 20', S.progress.p1.completedSets.x3, 20);
+      ok(P+'which finishes that exercise', S.progress.p1.doneExercises.indexOf('x3')>=0, true);
+      ok(P+'an exercise done by hand stays done', S.progress.p1.doneExercises.indexOf('x1')>=0, true);
+      ok(P+'History is left as it was', S.history[0].exercises[0].sets, -2);
+    """
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      let P='load: ', S=JSON.parse(w.localStorage.getItem('tp4_state'));
+      %(checks)s
+      w.openDetail('x1');
+      ok('load: the exercise opens with one set row', d.querySelectorAll('[id^="sr-x1-"]').length, 1);
+      w.openDetail('x3');
+      ok('load: the capped exercise shows twenty set rows', d.querySelectorAll('[id^="sr-x3-"]').length, 20);
+    """ % {"checks": checks}
+    report(drive(bad, body), "stored set counts")
+
+    # The same file through applyImport, into an install that was fine.
+    body2 = """
+      w.applyImport(%(file)s);
+      let P='import: ', S=w.eval('state');
+      %(checks)s
+    """ % {"file": json.dumps(bad), "checks": checks}
+    report(drive(DEMO, body2), "imported set counts")
+
+    # A state that is already in range, overrides and ticks included, is not
+    # rewritten: byte-identical after load.
+    fine = json.loads(json.dumps(DEMO))
+    fine["schema"] = 4
+    fine["globalExercises"] = [{"id": "g1", "name": "Lib", "type": "reps", "sets": 20}]
+    fine["progress"] = {"p1": {"completedSets": {"x1": 2}, "doneExercises": [],
+                               "overrides": {"x1": {"sets": 5}}}}
+    body3 = """
+      ok('an in-range state is not rewritten',
+         w.localStorage.getItem('tp4_state'), JSON.stringify(%s));
+    """ % json.dumps(fine)
+    report(drive(fine, body3), "in-range set counts")
 
 
 def _with_history(sessions):
