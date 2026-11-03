@@ -816,6 +816,21 @@ def test_stored_set_counts_are_brought_into_range():
     """ % json.dumps(fine)
     report(drive(fine, body3), "in-range set counts")
 
+    # This runs at the top level on every start, so it must not throw. A
+    # progress entry with ticks but no doneExercises list (an old build, a hand
+    # edit) made clampSets throw there, and the app never initialised.
+    odd = json.loads(json.dumps(DEMO))
+    odd["schema"] = 4
+    odd["plans"][0]["exercises"][0]["sets"] = -2
+    odd["progress"] = {"p1": {"completedSets": {"x1": 5}}}
+    body4 = """
+      let r; try{ r=w.eval('workoutMode'); }catch(e){ r='threw: '+e.message; }
+      ok('a progress entry without doneExercises does not stop the start', r, 'home');
+      ok('and the plan count is still repaired',
+         JSON.parse(w.localStorage.getItem('tp4_state')).plans[0].exercises[0].sets, 1);
+    """
+    report(drive(odd, body4), "set counts with odd progress")
+
 
 def _with_history(sessions):
     st = json.loads(json.dumps(DEMO))

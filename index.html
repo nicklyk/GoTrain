@@ -1307,9 +1307,13 @@ function normaliseSetCounts(st){
   // clampSets the editors use. prevMax is the new count, so an exercise done
   // by hand is never un-marked: no sets were added, a count was repaired.
   // Only where ticks exceed the count, so a consistent session is not touched.
+  // This runs at the top level on every start, so a throw here stops the
+  // whole app before it renders. clampSets reads doneExercises as an array;
+  // an entry stored without one (an old build, a hand edit -- importLooksSound
+  // refuses it on import) is skipped rather than allowed to throw.
   Object.keys(st.progress||{}).forEach(planId=>{
     const prog=st.progress[planId], plan=(st.plans||[]).find(p=>p&&p.id===planId);
-    if(!prog||!prog.completedSets||!plan) return;
+    if(!prog||!prog.completedSets||!Array.isArray(prog.doneExercises)||!plan) return;
     (plan.exercises||[]).forEach(e=>{
       if(!e||e.type==='time') return;
       const max=setCountOf(e.id,planId);
