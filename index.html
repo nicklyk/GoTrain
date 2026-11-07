@@ -1885,7 +1885,7 @@ const ADJUST_FIELDS = {
   reps: [
     {key:'kg',   label:'field.weight', hint:'kg',            type:'text'},
     {key:'reps', label:'field.reps',   hint:'reps.abbr',     type:'text'},
-    {key:'sets', label:'field.sets',   hint:'field.sets',    type:'number'}
+    {key:'sets', label:'field.sets',   hint:'field.sets',    type:'number', min:1, max:20}
   ],
   time: [
     {key:'durationSecs', label:'field.duration', hint:'unit.min', type:'duration'}
@@ -1905,6 +1905,7 @@ function openAdjust(){
     const control=f.type==='duration'
       ? `<button class="dur-field" id="adj-${f.key}" onclick="durFieldOpen('adj-${f.key}',t('${f.label}'),false,0)"></button>`
       : `<input class="s-inp" id="adj-${f.key}" type="${f.type}" inputmode="decimal"
+             ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''}
              value="${escAttr(ex[f.key]===undefined?'':ex[f.key])}">`;
     return `<div class="s-row">
       <div class="s-lbl">${t(f.label)}
@@ -1929,7 +1930,10 @@ function saveAdjust(){
     if(f.key==='sets'){
       const n=parseInt(val,10);
       if(!isFinite(n)||n<1) return;       // a plan with zero sets makes no sense
-      val=n;
+      // Capped at 20 like both editors (parseSetCount). Unlike them, below 1
+      // and empty are ignored rather than read as 3: an empty field here means
+      // "no change for today", not "the default".
+      val=Math.min(20,n);
     }
     // Only record what actually differs, so "adjusted" means adjusted.
     if(String(val)!==String(base[f.key]===undefined?'':base[f.key])) patch[f.key]=val;
