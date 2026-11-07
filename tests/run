@@ -687,6 +687,62 @@ def test_changing_sets_keeps_progress_consistent():
     report(drive(st, body), "set count")
 
 
+def test_adjusting_sets_stays_in_range():
+    print("\nset count adjusted for today out of range (browser)")
+    if not browser():
+        skip("adjust set count range", "no chromium found")
+        return
+    # Both editors stop at 20 sets (B-36); "Adjust for today" took any count
+    # above that and rendered that many set rows. Below 1, and empty, still
+    # mean "no change" there rather than the editors' default of 3.
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{}; w.confirm=()=>true; w.alert=()=>{};
+      const S=()=>w.eval('state');
+      const ov=()=>{ const o=S().progress.p1.overrides.x1; return o&&o.sets!==undefined?o.sets:'none'; };
+      const rows=()=>{ w.openDetail('x1'); return d.querySelectorAll('[id^="sr-x1-"]').length; };
+      const adjust=v=>{ w.openDetail('x1'); w.openAdjust();
+        d.getElementById('adj-sets').value=String(v); w.saveAdjust(); };
+
+      w.startWithPlan('p1');
+      w.openDetail('x1'); w.openAdjust();
+      ok('adjust: the field says the same maximum as the editors', d.getElementById('adj-sets').max, '20');
+      ok('adjust: and the same minimum', d.getElementById('adj-sets').min, '1');
+      w.closeModal('modalAdjust');
+
+      adjust(25);
+      ok('adjust: 25 is held as 20', ov(), 20);
+      ok('adjust: and the exercise has twenty set rows', rows(), 20);
+      adjust(500);
+      ok('adjust: 500 is held as 20', ov(), 20);
+      ok('adjust: and it was saved', JSON.parse(w.localStorage.getItem('tp4_state')).progress.p1.overrides.x1.sets, 20);
+      adjust(4);
+      ok('adjust: 4 is held as 4', ov(), 4);
+      ok('adjust: and the exercise has four set rows', rows(), 4);
+
+      w.resetAdjust();
+      adjust(0);
+      ok('adjust: 0 leaves the plan count', ov(), 'none');
+      ok('adjust: and the plan count of rows', rows(), 3);
+      adjust('');
+      ok('adjust: empty leaves the plan count', ov(), 'none');
+      adjust(-5);
+      ok('adjust: a negative count leaves the plan count', ov(), 'none');
+
+      // Ticked sets above the capped count follow it down, as B-25 does for
+      // any lowered count: tick 20 of 20, then ask for 25 -- it stays 20 of 20
+      // and done -- then lower to 18.
+      adjust(25);
+      for(let i=1;i<=20;i++) w.completeSet('x1',i);
+      ok('adjust: 20 of 20 ticked is done', w.isDone('x1'), true);
+      adjust(30);
+      ok('adjust: asking for more than 20 adds no set', w.getSets('x1')+'/'+rows(), '20/20');
+      ok('adjust: so the exercise stays done', w.isDone('x1'), true);
+      adjust(18);
+      ok('adjust: ticked sets follow a lower count', w.getSets('x1'), 18);
+    """
+    report(drive(DEMO, body), "adjust set count range")
+
+
 def test_a_typed_set_count_stays_in_range():
     print("\nset count typed out of range (browser)")
     if not browser():
