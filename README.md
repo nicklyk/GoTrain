@@ -23,7 +23,9 @@ unless you choose to move it.
   circuit loses no time on either
 - **Live tracking** — tick off sets; the exercise, its weight and every set
   fit on one screen. Step the weight by 2.5 kg right there, for this session
-  only, and the plan keeps its own
+  only, and the plan keeps its own. Finishing an exercise points you to the
+  next one still open, going back to one you skipped because its machine was
+  taken
 - **Rest timer** — between sets, lengthen or shorten it while it runs, and it
   shows what the next set asks for. A stopwatch per set is a tap away when you
   want one
@@ -138,7 +140,8 @@ That has two consequences worth understanding:
 - **Clearing site data deletes your history.** Use **Settings → Data → Export**
   to keep a backup, and **Import** to restore it. Import refuses a file that is
   damaged or malformed, and asks before replacing your history with a shorter
-  one.
+  one. A set count outside 1–20, from an old backup or a hand-edited file, is
+  brought back into range rather than leaving an exercise with no sets to tick.
 - **Hosting a copy gives you no access to anyone's data**, including your own on
   another device. Each origin, browser and device is a separate store.
 
