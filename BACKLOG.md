@@ -1,6 +1,6 @@
 # Backlog
 
-Updated 2026-11-07 (owner merge of GoTrain v43 and omarchy-gotrain 1.4.5; the scout refreshes it tonight). Edit freely: reorder lines, delete what you don't
+Updated 2026-11-09 by the scout (nothing built or closed since 2026-11-07; all ten re-checked against GoTrain v43 and omarchy-gotrain 1.4.5, line references still hold). Edit freely: reorder lines, delete what you don't
 want, add notes. The nightly build takes the highest item without an open PR.
 
 ## Top ten
