@@ -2597,10 +2597,17 @@ function openPlanDetail(planId){
   editingPlanId=planId; const plan=getPlanById(planId);
   document.getElementById('pd-name').textContent=plan.name;
   document.getElementById('pd-rename').title=t('rename');
-  document.getElementById('pd-meta').textContent=plan.phases.length+' '+t('phases')+' · '+plan.exercises.length+' '+t('exercises');
+  renderPlanMeta(plan);
   showPlanTab('phases');
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-plan-detail').classList.add('active');
+}
+
+// The header's "N Phases · M Exercises" line. Every edit that changes either
+// count calls this; deletePhase and deletePlanEx once did not, and the header
+// then kept the old count, as if the delete had not taken.
+function renderPlanMeta(plan){
+  document.getElementById('pd-meta').textContent=plan.phases.length+' '+t('phases')+' · '+plan.exercises.length+' '+t('exercises');
 }
 
 function showPlanTab(tab){
@@ -2643,14 +2650,14 @@ function addPhase(){
   const name=document.getElementById('newPhaseName').value.trim(); if(!name)return;
   const plan=getPlanById(editingPlanId); plan.phases.push({id:uid(),name,colorIdx:plan.phases.length%PHASE_COLORS});
   saveState();closeModal('modalAddPhase');renderPhaseEditor();
-  document.getElementById('pd-meta').textContent=plan.phases.length+' '+t('phases')+' · '+plan.exercises.length+' '+t('exercises');
+  renderPlanMeta(plan);
 }
 function deletePhase(phaseId){
   if(!confirm(t('confirm.del-phase')))return;
   const plan=getPlanById(editingPlanId);
   plan.exercises.forEach(e=>{if(e.phaseId===phaseId)e.phaseId=null;});
   plan.phases=plan.phases.filter(ph=>ph.id!==phaseId);
-  saveState();renderPhaseEditor();
+  saveState();renderPhaseEditor();renderPlanMeta(plan);
 }
 
 // ══════════════════════════════════════════════
@@ -2833,7 +2840,7 @@ function deletePlanEx(exId){
     if(prog.overrides) delete prog.overrides[exId];
     prog.doneExercises=(prog.doneExercises||[]).filter(id=>id!==exId);
   }
-  saveState(); renderPlanExercises(); updateProgress();
+  saveState(); renderPlanExercises(); renderPlanMeta(plan); updateProgress();
 }
 
 // ══════════════════════════════════════════════
@@ -3080,7 +3087,7 @@ function savePlanEx(){
   if(inSession) clampSets(editingPlanExId,before,editingPlanId);
   saveState(); closeModal('modalCustomizeEx'); renderPlanExercises();
   if(editingPlanId===state.activePlanId) updateProgress();
-  document.getElementById('pd-meta').textContent=plan.phases.length+' '+t('phases')+' · '+plan.exercises.length+' '+t('exercises');
+  renderPlanMeta(plan);
 }
 
 // ══════════════════════════════════════════════
