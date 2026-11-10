@@ -2214,6 +2214,39 @@ def test_the_next_exercise_wraps_to_one_skipped_earlier():
     report(drive(phased, body), "next exercise across phases")
 
 
+def test_deleting_keeps_the_plan_header_count_right():
+    print("\nplan header count after a delete (browser)")
+    if not browser():
+        skip("plan header count", "no chromium found")
+        return
+    # B-30: deleting a phase re-rendered the phase list but left the header's
+    # "2 Phases · 2 Exercises" as it was, so the delete looked as if it had
+    # not taken. Deleting an exercise had the same gap.
+    two = json.loads(json.dumps(DEMO))
+    two["plans"][0]["phases"].append({"id": "pl", "name": "Lower", "colorIdx": 1})
+    two["plans"][0]["exercises"][1]["phaseId"] = "pl"
+    body = """
+      w.confirm=()=>true;
+      const meta=()=>d.getElementById('pd-meta').textContent.match(/\\d+/g).join('/');
+      w.openPlanDetail('p1');
+      ok('the header starts at 2 phases, 2 exercises', meta(), '2/2');
+      w.deletePhase('pl');
+      ok('deleting a phase drops the header to 1 phase', meta(), '1/2');
+      ok('the phase list shows one phase', d.querySelectorAll('#ptab-phases .phase-editor').length, 1);
+      ok('the exercise of the deleted phase has no phase', w.eval('state').plans[0].exercises[1].phaseId, 'null');
+      w.showPlanTab('exercises');
+      const row=d.querySelector('#per-x2 .plan-ex-meta').textContent;
+      ok('its row names no phase', /Lower/.test(row), false);
+      ok('the other row still names its phase', /· S ·/.test(d.querySelector('#per-x1 .plan-ex-meta').textContent), true);
+      w.deletePlanEx('x2');
+      ok('deleting an exercise drops the header count', meta(), '1/1');
+      w.confirm=()=>false;
+      w.deletePlanEx('x1');
+      ok('a declined delete leaves the header alone', meta(), '1/1');
+    """
+    report(drive(two, body), "plan header count")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
