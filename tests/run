@@ -2236,10 +2236,14 @@ def test_the_export_is_named_for_the_local_day():
       ok('00:30 CET in winter likewise', %s, 'gotrain-2026-01-16.json');
       ok('a midday export is unchanged', %s, 'gotrain-2026-10-16.json');
       ok('a late-evening export keeps its own day', %s, 'gotrain-2026-10-16.json');
-      const REAL=w.Date.now;
-      w.Date.now=()=>Date.parse('2026-10-15T22:30:00Z');
-      ok('with no argument the clock is read', w.exportFilename(), 'gotrain-2026-10-16.json');
-      w.Date.now=REAL;
+      // Stop the clock at 00:30 CEST however the function reads it: a bare
+      // new Date() as well as Date.now(). That makes this check fail on the
+      // old UTC name (it gives the 15th) rather than only on the real date.
+      const RealDate=w.Date, AT=Date.parse('2026-10-15T22:30:00Z');
+      class Stopped extends RealDate{ constructor(...a){ a.length?super(...a):super(AT); } static now(){ return AT; } }
+      w.Date=Stopped;
+      try{ ok('with no argument the stopped clock is read', w.exportFilename(), 'gotrain-2026-10-16.json'); }
+      finally{ w.Date=RealDate; }
     """ % (at("2026-10-15T22:30:00Z"), at("2026-01-15T23:30:00Z"),
            at("2026-10-16T10:00:00Z"), at("2026-10-16T21:50:00Z"))
     report(drive(DEMO, body, tz="Europe/Berlin"), "export name in Berlin")
