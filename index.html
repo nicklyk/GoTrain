@@ -3192,7 +3192,15 @@ function exportData(){
   URL.revokeObjectURL(url);
 }
 
-function exportFilename(){ return 'gotrain-'+new Date().toISOString().slice(0,10)+'.json'; }
+// The date in the name is the phone's local date, like History's. It used to
+// come from toISOString(), which is UTC, so in Germany an export made between
+// midnight and 01:00 (02:00 in summer) was named for the day before and sat
+// beside the real previous backup looking like it. Date.now() rather than a
+// bare new Date() so a test can move the clock.
+function exportFilename(now=new Date(Date.now())){
+  const p=n=>String(n).padStart(2,'0');
+  return 'gotrain-'+now.getFullYear()+'-'+p(now.getMonth()+1)+'-'+p(now.getDate())+'.json';
+}
 function triggerImport(){ document.getElementById('import-file').click(); }
 // Split from importData so the merge can be exercised without a file picker.
 // Returns false when the user declines, leaving state untouched.

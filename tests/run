@@ -211,8 +211,12 @@ setTimeout(()=>{
 </script>"""
 
 
-def drive(state, body, timeout=90):
-    """Run assertions inside the real app and return them."""
+def drive(state, body, timeout=90, tz=None):
+    """Run assertions inside the real app and return them.
+
+    tz sets the browser's time zone through TZ, for checks whose answer
+    depends on the local date rather than the UTC one.
+    """
     chrome = browser()
     with tempfile.TemporaryDirectory() as d:
         work = Path(d)
@@ -235,7 +239,8 @@ def drive(state, body, timeout=90):
             r = subprocess.run([chrome, "--headless", "--disable-gpu", "--no-sandbox",
                                 "--virtual-time-budget=30000", "--window-size=402,874",
                                 "--dump-dom", "http://127.0.0.1:8771/driver.html"],
-                               capture_output=True, text=True, timeout=timeout)
+                               capture_output=True, text=True, timeout=timeout,
+                               env={**os.environ, "TZ": tz} if tz else None)
         finally:
             srv.terminate()
     m = re.search(r"<title>([^<]*)</title>", r.stdout)
@@ -2212,6 +2217,40 @@ def test_the_next_exercise_wraps_to_one_skipped_earlier():
       ok('the wrap names the earlier phase', phase(), 'Upper');
     """ % banner
     report(drive(phased, body), "next exercise across phases")
+
+
+def test_the_export_is_named_for_the_local_day():
+    print("\nexport file name uses the local date (browser)")
+    if not browser():
+        skip("export file name", "no chromium found")
+        return
+    # The name used to take its date from toISOString(), which is UTC: in
+    # Germany an export at 00:30 was named for the day before. The first
+    # check proves the browser really is in the zone asked for; without it a
+    # Chromium that ignored TZ would run in UTC and the rest would prove
+    # nothing.
+    at = lambda iso: "w.exportFilename(new w.Date(Date.parse('%s')))" % iso
+    body = """
+      ok('the browser runs in Berlin time', new w.Date(Date.parse('2026-10-15T22:30:00Z')).getDate(), 16);
+      ok('00:30 CEST is named for that day', %s, 'gotrain-2026-10-16.json');
+      ok('00:30 CET in winter likewise', %s, 'gotrain-2026-01-16.json');
+      ok('a midday export is unchanged', %s, 'gotrain-2026-10-16.json');
+      ok('a late-evening export keeps its own day', %s, 'gotrain-2026-10-16.json');
+      const REAL=w.Date.now;
+      w.Date.now=()=>Date.parse('2026-10-15T22:30:00Z');
+      ok('with no argument the clock is read', w.exportFilename(), 'gotrain-2026-10-16.json');
+      w.Date.now=REAL;
+    """ % (at("2026-10-15T22:30:00Z"), at("2026-01-15T23:30:00Z"),
+           at("2026-10-16T10:00:00Z"), at("2026-10-16T21:50:00Z"))
+    report(drive(DEMO, body, tz="Europe/Berlin"), "export name in Berlin")
+
+    # West of UTC the old bug ran the other way: an evening export was named
+    # for tomorrow.
+    body = """
+      ok('the browser runs in New York time', new w.Date(Date.parse('2026-10-16T01:00:00Z')).getDate(), 15);
+      ok('21:00 EDT is named for that day', %s, 'gotrain-2026-10-15.json');
+    """ % at("2026-10-16T01:00:00Z")
+    report(drive(DEMO, body, tz="America/New_York"), "export name in New York")
 
 
 def main():
