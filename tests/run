@@ -2279,6 +2279,61 @@ def test_a_full_storage_is_reported_not_swallowed():
         report(drive(state, "const WANT=%s;" % json.dumps(want) + body), f"full storage ({lang})")
 
 
+def test_a_full_storage_at_launch_still_opens_the_app():
+    print("\nfull storage at launch (browser)")
+    if not browser():
+        skip("full storage at launch", "no chromium found")
+        return
+    # A migration that grows tp4_state saves at load, at the top level of the
+    # script. Uncaught, the quota error stopped the script before `let lang`,
+    # so the app never rendered at all. The stored copy must stay as it was:
+    # the migration is idempotent and simply runs again on the next launch.
+    # The app is loaded a second time, into a fresh frame, once the quota is
+    # full; the report is rewritten after it has had time to start. The
+    # 30 s virtual-time budget comfortably covers the extra 3 s.
+    old = json.loads(json.dumps(DEMO))
+    old["schema"] = 2
+    row = old["plans"][0]["exercises"][1]
+    del row["durationSecs"]
+    row["durationMin"] = "8"
+    body = """
+      w.alert=()=>{};
+      w.localStorage.clear();
+      const stored=JSON.stringify(OLD);
+      w.localStorage.setItem('tp4_state', stored);
+      for(let size=1<<20, n=0; size>=1; size>>=1){
+        const chunk='x'.repeat(size);
+        for(;;){ try{ w.localStorage.setItem('filler'+n, chunk); n++; }catch(e){ break; } }
+      }
+      // A real alert() would block headless Chromium for good, and a page
+      // loaded by src runs its script before anyone can stub it. So the app
+      // is written into a blank same-origin frame whose alert is already set.
+      const g=document.createElement('iframe');
+      g.style.cssText='width:402px;height:874px;border:0';
+      document.body.appendChild(g);
+      const x=new XMLHttpRequest(); x.open('GET','index.html',false); x.send();
+      const alerts=[]; g.contentWindow.alert=m=>{ alerts.push(String(m)); };
+      g.contentDocument.open(); g.contentDocument.write(x.responseText); g.contentDocument.close();
+      setTimeout(()=>{
+        try{
+          const gw=g.contentWindow, gd=g.contentDocument;
+          ok('the app starts', typeof gw.eval('lang'), 'string');
+          ok('it renders, in its language', gd.querySelector('[data-i="nav.settings"]').textContent, NAV);
+          ok('the migration ran in memory', gw.eval('state').plans[0].exercises[1].durationSecs, 480);
+          ok('the failed save says so, once, in the app\\'s language', alerts.length+' '+String(alerts[0]).slice(0,WANT.length), '1 '+WANT);
+          ok('the stored copy is left as it was', gw.localStorage.getItem('tp4_state')===stored, true);
+        }catch(e){ out.push('FAIL|launch driver threw|'+e.message+'|-'); }
+        w.localStorage.clear();
+        document.title=out.join('~');
+      }, 3000);
+    """
+    for lang, nav, want in (("en", "Settings", "Storage is full:"),
+                            ("de", "Einstellungen", "Der Speicher ist voll:")):
+        old["lang"] = lang
+        pre = "const OLD=%s, NAV=%s, WANT=%s;" % (json.dumps(old), json.dumps(nav), json.dumps(want))
+        report(drive(DEMO, pre + body), f"full storage at launch ({lang})")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
