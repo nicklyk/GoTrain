@@ -895,6 +895,7 @@ const T = {
     'alert.last-plan':'Letzten Plan kann man nicht löschen.',
     'alert.no-name':'Bitte Name eingeben.',
     'import.error':'Ungültige Datei.',
+    'storage.full':'Der Speicher ist voll: Deine letzte Änderung konnte auf diesem Gerät nicht gespeichert werden. Exportiere jetzt (Einstellungen → Exportieren), damit nichts verloren geht.',
     'import.confirm.fewer':'Diese Datei enthält weniger Workouts als die App.\n\nIn der App: {n}\nIn der Datei: {m}\n\nDer Import ersetzt deinen Verlauf durch den aus der Datei. Workouts, die dort fehlen, gehen verloren. Trotzdem importieren?',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
     'history.sets':'Sätze',
@@ -996,6 +997,7 @@ const T = {
     'alert.last-plan':'Cannot delete the last plan.',
     'alert.no-name':'Please enter a name.',
     'import.error':'Invalid file.',
+    'storage.full':'Storage is full: your last change could not be saved on this device. Export now (Settings → Export) so nothing is lost.',
     'import.confirm.fewer':'This file has fewer workouts than this app.\n\nIn this app: {n}\nIn the file: {m}\n\nImporting replaces your history with the one in the file. Workouts missing from it are lost. Import anyway?',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
     'history.sets':'Sets',
@@ -1340,14 +1342,33 @@ function loadState(){
   try{ const s=localStorage.getItem('tp4_state'); if(s) return JSON.parse(s); }catch(e){}
   return defaultState();
 }
-function saveState(){ localStorage.setItem('tp4_state', JSON.stringify(state)); }
+// tp4_state is the user's only copy. When the origin's quota is full (Safari
+// allows about 5 MB, and History only grows), setItem throws. Uncaught, that
+// aborted whichever handler was saving: Finish left the screen on the running
+// workout, the new History entry existed only in memory, and nothing said so.
+// Catch it, let the caller carry on from memory, and say so once per session:
+// Export builds its file from memory, so it still holds everything. Nothing is
+// trimmed to make room -- what to delete is the user's decision, not ours.
+// Returns false when the save failed, so a caller can tell.
+let saveFailWarned=false;
+function saveState(){
+  try{ localStorage.setItem('tp4_state', JSON.stringify(state)); return true; }
+  catch(e){
+    if(!saveFailWarned){
+      saveFailWarned=true;
+      alert(t('storage.full'));
+    }
+    return false;
+  }
+}
 
 let state = loadState();
 // Both run: migrateMuscles leaves schema at 2, migrateDurations takes it to 3.
 const _m1=migrateMuscles(state), _m2=migrateDurations(state), _m3=migrateStale(state),
       _m4=normaliseSetCounts(state);
-if(_m1||_m2||_m3||_m4) saveState();
 let lang = state.lang || 'en';
+// After lang: a save that fails here alerts through t(), which reads it.
+if(_m1||_m2||_m3||_m4) saveState();
 
 // Locales whose date/time formats the desktop importer can still parse when an
 // entry predates the ISO `ts` field: 'de-DE' gives d.M.yyyy, 'en-US' M/D/YYYY.

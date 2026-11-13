@@ -2214,6 +2214,126 @@ def test_the_next_exercise_wraps_to_one_skipped_earlier():
     report(drive(phased, body), "next exercise across phases")
 
 
+
+def test_a_full_storage_is_reported_not_swallowed():
+    print("\nfull storage (browser)")
+    if not browser():
+        skip("full storage", "no chromium found")
+        return
+    # tp4_state is the only copy. When the origin's quota runs out, setItem
+    # throws; uncaught, Finish stopped half-way with the entry only in memory
+    # and no word to the user. The quota is filled with another key here, the
+    # way any other data on the origin would fill it.
+    body = """
+      const S=()=>w.eval('state');
+      const alerts=[]; w.alert=m=>{ alerts.push(m); };
+      w.confirm=()=>true; w.playBeep=()=>{}; w.vibrate=()=>{};
+      let exported=null;
+      const RealBlob=w.Blob;
+      w.Blob=function(parts,o){ exported=parts.join(''); return new RealBlob(parts,o); };
+      w.HTMLAnchorElement.prototype.click=function(){};
+
+      // Room to spare: nothing changes and nothing is said.
+      w.startWithPlan('p1'); w.completeSet('x1',1); w.clearRestTimer();
+      w.finishWorkout();
+      ok('with room, the entry is stored', JSON.parse(w.localStorage.getItem('tp4_state')).history.length, 1);
+      ok('with room, no alert', alerts.length, 0);
+      ok('with room, saveState reports success', w.saveState(), true);
+
+      w.startWithPlan('p1');
+      w.completeSet('x1',1); w.completeSet('x1',2); w.clearRestTimer();
+      const before=w.localStorage.getItem('tp4_state');
+
+      // Fill what is left of the origin's quota, largest pieces first.
+      let n=0;
+      for(let size=1<<20; size>=1; size>>=1){
+        const chunk='x'.repeat(size);
+        for(;;){ try{ w.localStorage.setItem('filler'+n, chunk); n++; }catch(e){ break; } }
+      }
+
+      let threw='none';
+      try{ w.finishWorkout(); }catch(e){ threw=e.name; }
+      ok('Finish throws nothing when storage is full', threw, 'none');
+      ok('one alert appears', alerts.length, 1);
+      ok('it says what happened, in the app\\'s language', String(alerts[0]).slice(0,WANT.length), WANT);
+      ok('Finish still leaves the running workout', w.eval('workoutMode'), 'home');
+      ok('the entry is in memory', S().history.length, 2);
+      ok('the stored copy is left as it was', w.localStorage.getItem('tp4_state')===before, true);
+      ok('saveState reports the failure', w.saveState(), false);
+
+      w.startWithPlan('p1'); w.completeSet('x1',1); w.clearRestTimer();
+      ok('a second failed save raises no second alert', alerts.length, 1);
+
+      w.exportData();
+      const ex=exported?JSON.parse(exported):{history:[]};
+      ok('Export still holds the new entry', ex.history.length+'/'+(ex.history[0]||{}).totalSets, '2/2');
+
+      for(let i=0;i<n;i++) w.localStorage.removeItem('filler'+i);
+      ok('once there is room again, saving works', w.saveState(), true);
+      ok('and the entry reaches storage', JSON.parse(w.localStorage.getItem('tp4_state')).history.length, 2);
+    """
+    for lang, want in (("en", "Storage is full: your last change could not be saved"),
+                       ("de", "Der Speicher ist voll: Deine letzte Änderung konnte")):
+        state = json.loads(json.dumps(DEMO))
+        state["lang"] = lang
+        report(drive(state, "const WANT=%s;" % json.dumps(want) + body), f"full storage ({lang})")
+
+
+def test_a_full_storage_at_launch_still_opens_the_app():
+    print("\nfull storage at launch (browser)")
+    if not browser():
+        skip("full storage at launch", "no chromium found")
+        return
+    # A migration that grows tp4_state saves at load, at the top level of the
+    # script. Uncaught, the quota error stopped the script before `let lang`,
+    # so the app never rendered at all. The stored copy must stay as it was:
+    # the migration is idempotent and simply runs again on the next launch.
+    # The app is loaded a second time, into a fresh frame, once the quota is
+    # full; the report is rewritten after it has had time to start. The
+    # 30 s virtual-time budget comfortably covers the extra 3 s.
+    old = json.loads(json.dumps(DEMO))
+    old["schema"] = 2
+    row = old["plans"][0]["exercises"][1]
+    del row["durationSecs"]
+    row["durationMin"] = "8"
+    body = """
+      w.alert=()=>{};
+      w.localStorage.clear();
+      const stored=JSON.stringify(OLD);
+      w.localStorage.setItem('tp4_state', stored);
+      for(let size=1<<20, n=0; size>=1; size>>=1){
+        const chunk='x'.repeat(size);
+        for(;;){ try{ w.localStorage.setItem('filler'+n, chunk); n++; }catch(e){ break; } }
+      }
+      // A real alert() would block headless Chromium for good, and a page
+      // loaded by src runs its script before anyone can stub it. So the app
+      // is written into a blank same-origin frame whose alert is already set.
+      const g=document.createElement('iframe');
+      g.style.cssText='width:402px;height:874px;border:0';
+      document.body.appendChild(g);
+      const x=new XMLHttpRequest(); x.open('GET','index.html',false); x.send();
+      const alerts=[]; g.contentWindow.alert=m=>{ alerts.push(String(m)); };
+      g.contentDocument.open(); g.contentDocument.write(x.responseText); g.contentDocument.close();
+      setTimeout(()=>{
+        try{
+          const gw=g.contentWindow, gd=g.contentDocument;
+          ok('the app starts', typeof gw.eval('lang'), 'string');
+          ok('it renders, in its language', gd.querySelector('[data-i="nav.settings"]').textContent, NAV);
+          ok('the migration ran in memory', gw.eval('state').plans[0].exercises[1].durationSecs, 480);
+          ok('the failed save says so, once, in the app\\'s language', alerts.length+' '+String(alerts[0]).slice(0,WANT.length), '1 '+WANT);
+          ok('the stored copy is left as it was', gw.localStorage.getItem('tp4_state')===stored, true);
+        }catch(e){ out.push('FAIL|launch driver threw|'+e.message+'|-'); }
+        w.localStorage.clear();
+        document.title=out.join('~');
+      }, 3000);
+    """
+    for lang, nav, want in (("en", "Settings", "Storage is full:"),
+                            ("de", "Einstellungen", "Der Speicher ist voll:")):
+        old["lang"] = lang
+        pre = "const OLD=%s, NAV=%s, WANT=%s;" % (json.dumps(old), json.dumps(nav), json.dumps(want))
+        report(drive(DEMO, pre + body), f"full storage at launch ({lang})")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
