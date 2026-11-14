@@ -1232,6 +1232,120 @@ def test_import_asks_before_shrinking_history():
     report(drive(have, body), "import confirmation")
 
 
+def test_import_asks_when_it_would_drop_a_workout():
+    print("\nimport that lacks a newer workout (browser)")
+    if not browser():
+        skip("import names lost workouts", "no chromium found")
+        return
+    # The count was a stand-in for "the file lacks workouts this app has".
+    # Equal counts with different entries -- an older backup with one more
+    # old workout in it -- used to replace the newest workout without asking.
+    def h(i, ts, **kw):
+        return dict({"id": i, "ts": ts, "plan": "Plan", "exercises": []}, **kw)
+    a = h("ha", "2026-11-01T10:00:00Z")
+    b = h("hb", "2026-11-05T10:00:00Z")
+    c = h("hc", "2026-11-12T10:00:00Z")
+    old = h("hold", "2026-10-20T10:00:00Z")
+    d = h("hd", "2026-11-13T10:00:00Z")
+    have = json.loads(json.dumps(DEMO))
+    have["history"] = [c, b, a]
+    def file_with(hist):
+        f = json.loads(json.dumps(DEMO))
+        f["plans"][0]["name"] = "From file"
+        f["history"] = hist
+        return f
+    swapped = file_with([b, a, old])
+    superset = file_with([d, c, b, a])
+    same = file_with([c, b, a])
+    two_lost = file_with([a, old, h("hx", "2026-09-01T10:00:00Z")])
+    nohist = file_with([])
+    del nohist["history"]
+    # An entry recorded before ids existed is matched by its ts instead.
+    legacy = {"ts": "2026-08-01T10:00:00Z", "plan": "Plan", "exercises": []}
+    have_legacy = json.loads(json.dumps(DEMO))
+    have_legacy["history"] = [a, legacy]
+    bare = {"date": "1.8.2026", "plan": "Plan", "exercises": []}
+    body = """
+      const F=%s;
+      const saved=localStorage.getItem('tp4_state');
+      let asked=[], answer=false;
+      w.confirm=m=>{ asked.push(m); return answer; };
+      const clone=o=>JSON.parse(JSON.stringify(o));
+      const ids=()=>w.eval('state').history.map(x=>x.id).join(',');
+
+      let r=w.applyImport(clone(F.swapped));
+      ok('same count but a missing workout asks', asked.length, 1);
+      ok('the question names one lost workout', asked[0].includes('lost by importing: 1'), true);
+      ok('the question still names both counts', asked[0].includes('In this app: 3') && asked[0].includes('In the file: 3'), true);
+      ok('declining reports it', r, false);
+      ok('declining keeps the newest workout', ids(), 'hc,hb,ha');
+      ok('declining keeps the plans', w.eval('state').plans[0].name, 'Plan');
+      ok('declining saves nothing', localStorage.getItem('tp4_state'), saved);
+
+      w.eval("lang='de'"); asked=[];
+      w.applyImport(clone(F.swapped));
+      ok('asked in German too', asked.length, 1);
+      ok('the German question names one lost workout', asked[0].includes('gehen verloren: 1'), true);
+      ok('the German question names the counts', asked[0].includes('In der App: 3') && asked[0].includes('In der Datei: 3'), true);
+      w.eval("lang='en'");
+
+      asked=[];
+      w.applyImport(clone(F.two_lost));
+      ok('the number counts every missing workout', asked[0].includes('lost by importing: 2'), true);
+
+      asked=[];
+      w.applyImport(clone(F.same));
+      ok('a file with exactly these workouts asks nothing', asked.length, 0);
+      ok('and is taken', w.eval('state').plans[0].name, 'From file');
+
+      asked=[];
+      r=w.applyImport(clone(F.superset));
+      ok('a file with every workout and one more asks nothing', asked.length, 0);
+      ok('and imports', ids(), 'hd,hc,hb,ha');
+
+      asked=[];
+      w.applyImport(clone(F.nohist));
+      ok('a file without history asks nothing', asked.length, 0);
+      ok('and leaves history alone', ids(), 'hd,hc,hb,ha');
+
+      // Back to a,b,c, then accept the swapped file: it replaces as before.
+      w.applyImport(clone(F.same)); asked=[]; answer=true;
+      r=w.applyImport(clone(F.swapped));
+      ok('accepting reports it', r, true);
+      ok('accepting imports the file as before', ids(), 'hb,ha,hold');
+    """ % json.dumps({"swapped": swapped, "superset": superset, "same": same,
+                      "two_lost": two_lost, "nohist": nohist})
+    report(drive(have, body), "import names lost workouts")
+
+    body = """
+      const F=%s;
+      let asked=[];
+      w.confirm=m=>{ asked.push(m); return false; };
+      const clone=o=>JSON.parse(JSON.stringify(o));
+      w.applyImport(clone(F.keeps));
+      ok('an entry without id is found by its ts', asked.length, 0);
+      asked=[];
+      w.eval('state').history=clone(F.keeps.history);
+      w.applyImport(clone(F.drops));
+      ok('an entry without id missing by ts is counted', asked.length===1 && asked[0].includes('lost by importing: 1'), true);
+
+      // Neither id nor ts: the last fallback compares the whole entry.
+      w.eval('state').history=clone(F.bare_have);
+      asked=[];
+      w.applyImport(clone(F.bare_same));
+      ok('an entry with neither id nor ts is found by its content', asked.length, 0);
+      w.eval('state').history=clone(F.bare_have);
+      asked=[];
+      w.applyImport(clone(F.bare_other));
+      ok('a different entry with neither is counted', asked.length===1 && asked[0].includes('lost by importing: 1'), true);
+    """ % json.dumps({"keeps": file_with([dict(a), dict(legacy)]),
+                      "drops": file_with([dict(a), old]),
+                      "bare_have": [dict(bare)],
+                      "bare_same": file_with([dict(bare)]),
+                      "bare_other": file_with([dict(bare, date="2.8.2026")])})
+    report(drive(have_legacy, body), "import matches legacy entries by ts")
+
+
 def test_an_import_with_unsafe_ids_is_refused():
     print("\nimport with unsafe ids (browser)")
     if not browser():
