@@ -1264,6 +1264,7 @@ def test_import_asks_when_it_would_drop_a_workout():
     legacy = {"ts": "2026-08-01T10:00:00Z", "plan": "Plan", "exercises": []}
     have_legacy = json.loads(json.dumps(DEMO))
     have_legacy["history"] = [a, legacy]
+    bare = {"date": "1.8.2026", "plan": "Plan", "exercises": []}
     body = """
       const F=%s;
       const saved=localStorage.getItem('tp4_state');
@@ -1327,8 +1328,21 @@ def test_import_asks_when_it_would_drop_a_workout():
       w.eval('state').history=clone(F.keeps.history);
       w.applyImport(clone(F.drops));
       ok('an entry without id missing by ts is counted', asked.length===1 && asked[0].includes('lost by importing: 1'), true);
+
+      // Neither id nor ts: the last fallback compares the whole entry.
+      w.eval('state').history=clone(F.bare_have);
+      asked=[];
+      w.applyImport(clone(F.bare_same));
+      ok('an entry with neither id nor ts is found by its content', asked.length, 0);
+      w.eval('state').history=clone(F.bare_have);
+      asked=[];
+      w.applyImport(clone(F.bare_other));
+      ok('a different entry with neither is counted', asked.length===1 && asked[0].includes('lost by importing: 1'), true);
     """ % json.dumps({"keeps": file_with([dict(a), dict(legacy)]),
-                      "drops": file_with([dict(a), old])})
+                      "drops": file_with([dict(a), old]),
+                      "bare_have": [dict(bare)],
+                      "bare_same": file_with([dict(bare)]),
+                      "bare_other": file_with([dict(bare, date="2.8.2026")])})
     report(drive(have_legacy, body), "import matches legacy entries by ts")
 
 
