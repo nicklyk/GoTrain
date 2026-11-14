@@ -895,7 +895,7 @@ const T = {
     'alert.last-plan':'Letzten Plan kann man nicht löschen.',
     'alert.no-name':'Bitte Name eingeben.',
     'import.error':'Ungültige Datei.',
-    'import.confirm.fewer':'Diese Datei enthält weniger Workouts als die App.\n\nIn der App: {n}\nIn der Datei: {m}\n\nDer Import ersetzt deinen Verlauf durch den aus der Datei. Workouts, die dort fehlen, gehen verloren. Trotzdem importieren?',
+    'import.confirm.lost':'Dieser Datei fehlen Workouts, die in der App sind.\n\nIn der App: {n}\nIn der Datei: {m}\nFehlen in der Datei und gehen verloren: {k}\n\nDer Import ersetzt deinen Verlauf durch den aus der Datei. Trotzdem importieren?',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
     'history.sets':'Sätze',
     'plan.empty':'Neuer leerer Plan','plan.copy':'Kopie',
@@ -996,7 +996,7 @@ const T = {
     'alert.last-plan':'Cannot delete the last plan.',
     'alert.no-name':'Please enter a name.',
     'import.error':'Invalid file.',
-    'import.confirm.fewer':'This file has fewer workouts than this app.\n\nIn this app: {n}\nIn the file: {m}\n\nImporting replaces your history with the one in the file. Workouts missing from it are lost. Import anyway?',
+    'import.confirm.lost':'This file is missing workouts that are in this app.\n\nIn this app: {n}\nIn the file: {m}\nMissing from the file, and lost by importing: {k}\n\nImporting replaces your history with the one in the file. Import anyway?',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
     'history.sets':'Sets',
     'plan.empty':'New empty plan','plan.copy':'Copy',
@@ -3255,15 +3255,39 @@ function importLooksSound(imp){
   if(!idsLookSafe(imp)) return false;
   return true;
 }
+// How many of `have`'s history entries have no counterpart in `file`.
+// Matched by id, which saveHistory always assigns; an entry from before ids
+// existed is matched by its ts, and one with neither by its whole content.
+function historyMissingFrom(have,file){
+  const ids=new Set(), tss=new Set(), whole=new Set();
+  file.forEach(h=>{
+    if(h.id!=null) ids.add(h.id);
+    if(h.ts!=null) tss.add(h.ts);
+    whole.add(JSON.stringify(h));
+  });
+  return have.filter(h=>h.id!=null ? !ids.has(h.id)
+                      : h.ts!=null ? !tss.has(h.ts)
+                      : !whole.has(JSON.stringify(h))).length;
+}
 function applyImport(imported){
   if(!importLooksSound(imported)) throw new Error('invalid');
   // Object.assign below replaces history wholesale, and tp4_state is the only
   // copy. Importing an older backup would silently drop every workout logged
-  // since it was taken, so name the counts and let the user back out. A file
-  // with no history field at all leaves history alone and needs no question.
-  const have=(state.history||[]).length;
-  if(Array.isArray(imported.history) && imported.history.length<have
-     && !confirm(t('import.confirm.fewer').replace('{n}',have).replace('{m}',imported.history.length))) return false;
+  // since it was taken, so name what would be lost and let the user back out.
+  // A file with no history field at all leaves history alone and needs no
+  // question.
+  //
+  // This compares entries, not counts. "The file has fewer" was a stand-in
+  // for "the file lacks some of ours", and it misses every case where the two
+  // differ but the counts don't: a backup taken before one entry was deleted
+  // and one more logged, or a file from the Safari copy rather than the
+  // home-screen app (separate storage, same origin name).
+  if(Array.isArray(imported.history)){
+    const have=state.history||[];
+    const lost=historyMissingFrom(have,imported.history);
+    if(lost>0 && !confirm(t('import.confirm.lost').replace('{n}',have.length)
+         .replace('{m}',imported.history.length).replace('{k}',lost))) return false;
+  }
   // Exports from before 2026-09-10 carry no schema field at all. Left alone,
   // Object.assign would keep the running state's schema, both migrations would
   // see it as current and skip, and every timed exercise would fall back to
