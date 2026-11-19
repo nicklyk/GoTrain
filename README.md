@@ -135,13 +135,19 @@ new page.
 Everything lives in your browser's `localStorage`, under the origin you loaded
 the app from. It is never uploaded — there is nowhere to upload it *to*.
 
-That has two consequences worth understanding:
+That has three consequences worth understanding:
 
 - **Clearing site data deletes your history.** Use **Settings → Data → Export**
   to keep a backup, and **Import** to restore it. Import refuses a file that is
-  damaged or malformed, and asks before replacing your history with a shorter
-  one. A set count outside 1–20, from an old backup or a hand-edited file, is
-  brought back into range rather than leaving an exercise with no sets to tick.
+  damaged or malformed, and asks before replacing your history with one that
+  is missing any of your workouts, saying how many would be lost. The backup
+  is named for the day you made it, in your own time zone. A set count
+  outside 1–20, from an old backup or a hand-edited file, is brought back
+  into range rather than leaving an exercise with no sets to tick.
+- **Browsers cap how much a site may store** (Safari: about 5 MB). If
+  GoTrain ever runs out of room, it says so once and keeps working from
+  memory; export straight away, because until there is room again your
+  changes are not saved on the device. Nothing is deleted to make room.
 - **Hosting a copy gives you no access to anyone's data**, including your own on
   another device. Each origin, browser and device is a separate store.
 
