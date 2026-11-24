@@ -2524,6 +2524,31 @@ def test_a_full_storage_at_launch_still_opens_the_app():
         report(drive(DEMO, pre + body), f"full storage at launch ({lang})")
 
 
+def test_the_german_confirms_are_spelled_with_umlauts():
+    print("\nGerman confirm dialogs (browser)")
+    if not browser():
+        skip("German confirms", "no chromium found")
+        return
+    # These two were the only German strings with umlauts spelt out
+    # ("zuruecksetzen", "loeschen"), and the second is the confirm in front of
+    # Delete all data. The two strings are asserted rather than linting T.de
+    # for ae/oe/ue, which would flag correct words like "Dauer" and "Neue".
+    # confirm is stubbed to record and decline, so nothing is reset.
+    body = """
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      const asked=[]; w.confirm=m=>{ asked.push(m); return false; };
+      for(const [lng,a,b] of [['de','Trainingsfortschritt zurücksetzen?','Wirklich ALLE Daten löschen?'],
+                              ['en','Reset workout progress?','Really DELETE ALL data?']]){
+        w.changeLang(lng); asked.length=0;
+        w.startWithPlan('p1'); w.newWorkout(); w.confirmResetAll();
+        ok(lng+': Start new workout asks', asked[0], a);
+        ok(lng+': Delete all data asks', asked[1], b);
+      }
+      ok('declining kept the data', w.localStorage.getItem('tp4_state')!==null, true);
+    """
+    report(drive(DEMO, body), "German confirms")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.
