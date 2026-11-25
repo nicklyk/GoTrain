@@ -2366,6 +2366,59 @@ def test_deleting_keeps_the_plan_header_count_right():
     report(drive(two, body), "plan header count")
 
 
+def test_deleting_the_running_plan_says_its_workout_is_lost():
+    print("\ndeleting the running plan warns about its progress (browser)")
+    if not browser():
+        skip("delete running plan", "no chromium found")
+        return
+    # B-47: deleting the plan mid-workout discards its session without saving
+    # it to History -- on purpose, as Abort does -- but the confirm only asked
+    # "Really delete plan?", where Abort's says the progress will be lost.
+    two = json.loads(json.dumps(DEMO))
+    second = json.loads(json.dumps(two["plans"][0]))
+    second["id"], second["name"] = "p2", "Other"
+    two["plans"].append(second)
+    body = """
+      const asked=[]; let answer=false;
+      w.confirm=m=>{ asked.push(String(m)); return answer; };
+      w.playBeep=()=>{}; w.vibrate=()=>{};
+      const S=()=>w.eval('state');
+      const stored=()=>JSON.parse(w.localStorage.getItem('tp4_state'));
+      const last=()=>asked[asked.length-1];
+
+      w.startWithPlan('p1');
+      w.deletePlanById('p1');
+      ok('a running plan with nothing ticked keeps the plain confirm', last(), PLAIN);
+
+      w.openDetail('x1'); w.completeSet('x1',1); w.completeSet('x1',2);
+      w.clearRestTimer();
+      w.deletePlanById('p2');
+      ok('another plan, while one is running, keeps the plain confirm', last(), PLAIN);
+      ok('asking about a plan does not give it a progress entry', 'p2' in S().progress, false);
+
+      w.deletePlanById('p1');
+      ok('the running plan with ticked sets says its workout is lost', last(), LOST);
+      ok('declined: the plan is kept', S().plans.map(p=>p.id).join(','), 'p1,p2');
+      ok('declined: the ticked sets are kept', S().progress.p1.completedSets.x1, 2);
+      ok('declined: the workout is still running', S().activePlanId+' '+w.eval('workoutMode'), 'p1 active');
+
+      answer=true;
+      w.deletePlanById('p1');
+      ok('accepted: the plan is gone', S().plans.map(p=>p.id).join(','), 'p2');
+      ok('accepted: History is still empty, as before', S().history.length+' '+stored().history.length, '0 0');
+      ok('accepted: its progress is gone from storage', 'p1' in stored().progress, false);
+      ok('one confirm per delete', asked.length, 4);
+    """
+    for lang, plain, lost in (
+            ("en", "Really delete plan?",
+             "Delete plan? Its workout in progress will be lost, not saved to History."),
+            ("de", "Plan wirklich löschen?",
+             "Plan löschen? Das laufende Training geht verloren und wird nicht im Verlauf gespeichert.")):
+        two["lang"] = lang
+        pre = "const PLAIN=%s, LOST=%s;" % (json.dumps(plain), json.dumps(lost))
+        report(drive(two, pre + body), f"delete running plan ({lang})")
+
+
 def test_the_export_is_named_for_the_local_day():
     print("\nexport file name uses the local date (browser)")
     if not browser():
