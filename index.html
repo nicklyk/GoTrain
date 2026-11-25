@@ -890,7 +890,9 @@ const T = {
     'confirm.new-workout':'Trainingsfortschritt zuruecksetzen?',
     'confirm.reset-all':'Wirklich ALLE Daten loeschen?',
     'confirm.del-phase':'Phase löschen? Zugehörige Übungen werden ohne Phase belassen.',
-    'confirm.del-plan':'Plan wirklich löschen?','confirm.del-ex':'Übung aus Plan entfernen?',
+    'confirm.del-plan':'Plan wirklich löschen?',
+    'confirm.del-plan-progress':'Plan löschen? Das laufende Training geht verloren und wird nicht im Verlauf gespeichert.',
+    'confirm.del-ex':'Übung aus Plan entfernen?',
     'confirm.del-gex':'Übung aus Bibliothek löschen?',
     'alert.last-plan':'Letzten Plan kann man nicht löschen.',
     'alert.no-name':'Bitte Name eingeben.',
@@ -992,7 +994,9 @@ const T = {
     'confirm.new-workout':'Reset workout progress?',
     'confirm.reset-all':'Really DELETE ALL data?',
     'confirm.del-phase':'Delete phase? Exercises will be left without a phase.',
-    'confirm.del-plan':'Really delete plan?','confirm.del-ex':'Remove exercise from plan?',
+    'confirm.del-plan':'Really delete plan?',
+    'confirm.del-plan-progress':'Delete plan? Its workout in progress will be lost, not saved to History.',
+    'confirm.del-ex':'Remove exercise from plan?',
     'confirm.del-gex':'Delete exercise from library?',
     'alert.last-plan':'Cannot delete the last plan.',
     'alert.no-name':'Please enter a name.',
@@ -3188,10 +3192,15 @@ function deletePlanById(planId){ removePlan(planId); }
 // inherits activePlanId is shown as the running workout. The deleted plan's
 // progress goes too: nothing can reach it again, but it would ride along in
 // tp4_state and every export. The session is not saved to History; the
-// confirm is for deleting the plan, the same way aborting discards one.
+// confirm is for deleting the plan, the same way aborting discards one --
+// but Abort says the progress will be lost, so when there is progress to lose
+// this confirm says so too. state.progress is read directly rather than
+// through getProg, which would create an empty entry for a plan about to go.
 function removePlan(planId){
   if(state.plans.length<=1){alert(t('alert.last-plan'));return false;}
-  if(!confirm(t('confirm.del-plan')))return false;
+  const prog=state.progress[planId];
+  const hasProgress=!!prog&&((prog.doneExercises||[]).length>0||Object.values(prog.completedSets||{}).some(v=>v>0));
+  if(!confirm(t(hasProgress?'confirm.del-plan-progress':'confirm.del-plan')))return false;
   state.plans=state.plans.filter(p=>p.id!==planId);
   delete state.progress[planId];
   if(state.activePlanId===planId){
