@@ -893,6 +893,79 @@ def test_stored_set_counts_are_brought_into_range():
     report(drive(odd, body4), "set counts with odd progress")
 
 
+def test_a_plan_without_a_name_still_opens():
+    print("\nplan without a name (browser)")
+    if not browser():
+        skip("plan without a name", "no chromium found")
+        return
+    # B-55: an import checked a plan's phases and exercises but not its name,
+    # and the header and resume banner call toUpperCase on it. A nameless plan
+    # with a ticked set threw inside renderWorkoutHome on every launch, so the
+    # Workout tab came up empty. The name is now repaired at load and import.
+    cases = (("missing", "<del>", "Untitled plan", "en"),
+             ("null", None, "Untitled plan", "en"),
+             ("blank", "   ", "Untitled plan", "en"),
+             ("an object", {"x": 1}, "Untitled plan", "en"),
+             ("42", 42, "42", "en"),
+             ("missing, in German", "<del>", "Unbenannter Plan", "de"))
+    for label, name, want, lang in cases:
+        bad = json.loads(json.dumps(DEMO))
+        bad["schema"] = 4
+        bad["lang"] = lang
+        if name == "<del>":
+            del bad["plans"][0]["name"]
+        else:
+            bad["plans"][0]["name"] = name
+        # A ticked set: the case that blanked the home screen on every start.
+        bad["progress"] = {"p1": {"completedSets": {"x1": 1}, "doneExercises": []}}
+        W = json.dumps(want)
+        body = """
+          const P=%(P)s, WANT=%(W)s;
+          let S=JSON.parse(w.localStorage.getItem('tp4_state'));
+          ok(P+'the stored name is repaired', S.plans[0].name, WANT);
+          const banner=d.querySelector('.wab-title'), card=d.querySelector('.home-plan .psc-name');
+          ok(P+'the home screen draws the resume banner', banner?banner.textContent:'none', WANT.toUpperCase());
+          ok(P+'and the plan card', card?card.textContent:'none', WANT);
+          let r='ok'; try{ w.startWithPlan('p1'); }catch(e){ r='threw: '+e.message; }
+          ok(P+'resuming throws nothing', r, 'ok');
+          ok(P+'the header shows the name', d.getElementById('h-plan-name').textContent, WANT.toUpperCase());
+          ok(P+'the ticked set is still there', w.eval('state').progress.p1.completedSets.x1, 1);
+          w.renderPlansList();
+          ok(P+'Settings lists it under that name', d.querySelector('#plans-list .card-name').textContent, WANT);
+        """ % {"P": json.dumps(f"load, {label}: "), "W": W}
+        report(drive(bad, body), f"nameless plan at load ({label})")
+
+    # The same file through applyImport, into an install that was fine. The
+    # import is accepted, not refused, and the placeholder follows the file's
+    # language, which is the app's once it is imported.
+    for lang, want in (("en", "Untitled plan"), ("de", "Unbenannter Plan")):
+        file = json.loads(json.dumps(DEMO))
+        file["lang"] = lang
+        del file["plans"][0]["name"]
+        body = """
+          let r; try{ r=w.applyImport(%(file)s); }catch(e){ r='threw: '+e.message; }
+          ok(P+'the import is accepted', r, true);
+          ok(P+'the name is repaired in memory', w.eval('state').plans[0].name, WANT);
+          let h='ok'; try{ w.startWithPlan('p1'); }catch(e){ h='threw: '+e.message; }
+          ok(P+'starting it throws nothing', h, 'ok');
+          ok(P+'the header shows the placeholder', d.getElementById('h-plan-name').textContent, WANT.toUpperCase());
+        """ % {"file": json.dumps(file)}
+        report(drive(DEMO, ("const P=%s, WANT=%s;" % (json.dumps(f"import ({lang}): "), json.dumps(want))) + body),
+               f"nameless plan on import ({lang})")
+
+    # A name that is already a string is left exactly as it was, spaces and
+    # all, and a state with nothing to repair is not rewritten.
+    fine = json.loads(json.dumps(DEMO))
+    fine["schema"] = 4
+    fine["plans"][0]["name"] = " Push day "
+    body = """
+      ok('a named plan keeps its name, spaces included', w.eval('state').plans[0].name, ' Push day ');
+      ok('a state with named plans is not rewritten',
+         w.localStorage.getItem('tp4_state'), JSON.stringify(%s));
+    """ % json.dumps(fine)
+    report(drive(fine, body), "named plan")
+
+
 def _with_history(sessions):
     st = json.loads(json.dumps(DEMO))
     st["history"] = sessions
