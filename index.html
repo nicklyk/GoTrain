@@ -899,7 +899,7 @@ const T = {
     'import.confirm.lost':'Dieser Datei fehlen Workouts, die in der App sind.\n\nIn der App: {n}\nIn der Datei: {m}\nFehlen in der Datei und gehen verloren: {k}\n\nDer Import ersetzt deinen Verlauf durch den aus der Datei. Trotzdem importieren?',
     'congrats.title':'WORKOUT ABGESCHLOSSEN!','congrats.sub':'Stark gemacht – der Körper dankt es dir.',
     'history.sets':'Sätze',
-    'plan.empty':'Neuer leerer Plan','plan.copy':'Kopie',
+    'plan.empty':'Neuer leerer Plan','plan.copy':'Kopie','plan.untitled':'Unbenannter Plan',
     'btn.plan-empty':'Leeren Plan erstellen','btn.plan-copy':'Plan kopieren',
     'modal.copy-source':'WELCHEN PLAN KOPIEREN?','modal.copy-source.sub':'Wähle den Plan der kopiert werden soll:',
     'workout.noplan.title':'NOCH KEIN PLAN','workout.noplan.sub':'Lege deinen ersten Trainingsplan an, dann kann es losgehen.',
@@ -1001,7 +1001,7 @@ const T = {
     'import.confirm.lost':'This file is missing workouts that are in this app.\n\nIn this app: {n}\nIn the file: {m}\nMissing from the file, and lost by importing: {k}\n\nImporting replaces your history with the one in the file. Import anyway?',
     'congrats.title':'WORKOUT COMPLETE!','congrats.sub':'Well done – your body thanks you.',
     'history.sets':'Sets',
-    'plan.empty':'New empty plan','plan.copy':'Copy',
+    'plan.empty':'New empty plan','plan.copy':'Copy','plan.untitled':'Untitled plan',
     'btn.plan-empty':'Create empty plan','btn.plan-copy':'Copy a plan',
     'modal.copy-source':'WHICH PLAN TO COPY?','modal.copy-source.sub':'Select the plan you want to copy:',
     'workout.noplan.title':'NO PLAN YET','workout.noplan.sub':'Create your first training plan and you are ready to go.',
@@ -1325,6 +1325,28 @@ function normaliseSetCounts(st){
   return touched>0;
 }
 
+// The app always writes a plan's name as a non-empty string, but an import
+// only checks that plans have phases and exercises, so a hand-edited or
+// foreign file can bring one with no name, null or a number. The header and
+// the resume banner call toUpperCase on it, and once such a plan had a ticked
+// set the throw came from renderWorkoutHome on every launch: the Workout tab
+// stayed empty with no way back into the session. Repair it in place instead
+// of refusing the file -- rejecting a backup over a missing label loses more
+// than it protects. A number or boolean keeps its text ("42"); anything else
+// gets a placeholder the user can rename in Settings. A name that is already
+// a non-empty string is never touched, surrounding spaces included.
+// Uses t(), so it runs once lang is set -- at load and after an import.
+function normalisePlanNames(st){
+  let touched=0;
+  (st.plans||[]).forEach(p=>{
+    if(!p||(typeof p.name==='string'&&p.name.trim())) return;
+    const n=p.name;
+    p.name=(typeof n==='number'&&isFinite(n))||typeof n==='boolean' ? String(n) : t('plan.untitled');
+    touched++;
+  });
+  return touched>0;
+}
+
 // ══════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════
@@ -1367,8 +1389,10 @@ let state = loadState();
 const _m1=migrateMuscles(state), _m2=migrateDurations(state), _m3=migrateStale(state),
       _m4=normaliseSetCounts(state);
 let lang = state.lang || 'en';
+// After lang: the placeholder name is in the app's language.
+const _m5=normalisePlanNames(state);
 // After lang: a save that fails here alerts through t(), which reads it.
-if(_m1||_m2||_m3||_m4) saveState();
+if(_m1||_m2||_m3||_m4||_m5) saveState();
 
 // Locales whose date/time formats the desktop importer can still parse when an
 // entry predates the ISO `ts` field: 'de-DE' gives d.M.yyyy, 'en-US' M/D/YYYY.
@@ -1701,7 +1725,7 @@ function updateHeader(){
 }
 
 function setWorkoutHeader(planName){
-  document.getElementById('h-plan-name').textContent = planName.toUpperCase();
+  document.getElementById('h-plan-name').textContent = String(planName??'').toUpperCase();
   document.getElementById('h-sub').textContent = '🟢 ' + t('workout.active.banner.title');
   document.querySelector('.prw').style.visibility = '';
   syncHeaderOffset();
@@ -1741,7 +1765,7 @@ function renderWorkoutHome(){
     bannerHTML = `<div class="workout-active-banner" onclick="startWithPlan('${state.activePlanId}')">
       <div class="wab-dot"></div>
       <div class="wab-info">
-        <div class="wab-title">${escHtml(plan.name.toUpperCase())}</div>
+        <div class="wab-title">${escHtml(String(plan.name??'').toUpperCase())}</div>
         <div class="wab-sub">${done}/${total} · ${pct}%</div>
       </div>
       <button class="wab-btn" onclick="event.stopPropagation();startWithPlan('${state.activePlanId}')">${t('workout.active.resume')}</button>
@@ -3335,6 +3359,7 @@ function applyImport(imported){
   migrateStale(state);
   normaliseSetCounts(state);
   lang=state.lang||'en';
+  normalisePlanNames(state);
   return true;
 }
 function importData(event){
