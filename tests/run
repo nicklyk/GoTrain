@@ -2524,6 +2524,76 @@ def test_a_full_storage_at_launch_still_opens_the_app():
         report(drive(DEMO, pre + body), f"full storage at launch ({lang})")
 
 
+def test_an_exercise_duration_cannot_be_picked_as_zero():
+    print("\nexercise duration never 0:00 (browser)")
+    if not browser():
+        skip("exercise duration floor", "no chromium found")
+        return
+    # B-52: the picker offers 0:00 because a rest may be zero. For an
+    # exercise's length the library and plan editors stored `value||300`, so
+    # a picked 0:00 (shown in the field) was saved as 5:00, while "Adjust for
+    # today" saved the 0. Now the exercise-length picker snaps 0:00 up to its
+    # smallest step and all three keep what the field shows.
+    body = """
+      // Open the field's own picker (its real onclick), turn the wheels to
+      // m:s, and confirm, as a tap on Save would.
+      const pick=(id,m,s)=>{
+        d.getElementById(id).click();
+        // A rest opens on "use default"; untick it, as the user would.
+        if(d.getElementById('dur-default').classList.contains('on')) w.durToggleDefault();
+        d.getElementById('dur-min').scrollTop=m*w.eval('WHEEL_ITEM_H');
+        d.getElementById('dur-sec').scrollTop=(s/5)*w.eval('WHEEL_ITEM_H');
+        w.durConfirm();
+        return d.getElementById(id).textContent;
+      };
+      const S=()=>w.eval('state');
+      const newGex=(name,m,s)=>{
+        w.openAddGex(); w.setGexType('time');
+        d.getElementById('gex-name').value=name;
+        const shown=m==null?d.getElementById('gex-dur').textContent:pick('gex-dur',m,s);
+        w.saveGex();
+        return [shown, S().globalExercises.find(g=>g.name===name).durationSecs];
+      };
+
+      // Library editor.
+      let r=newGex('Plank',0,0);
+      ok('library: 0:00 shows as 0:05', r[0], '0:05');
+      ok('library: 0:00 stores 5, not 300', r[1], 5);
+      r=newGex('Bike',1,30);
+      ok('library: 1:30 still stores 90', r[1], 90);
+      r=newGex('Walk',null);
+      ok('library: an untouched new exercise still stores 300', r[1], 300);
+      w.openEditGex(S().globalExercises.find(g=>g.name==='Plank').id);
+      ok('library: reopening shows the stored 0:05', d.getElementById('gex-dur').textContent, '0:05');
+      w.closeModal('modalAddGex');
+
+      // Plan exercise editor, on the timed Row.
+      w.openPlanDetail('p1'); w.openEditPlanEx('x2');
+      ok('plan: 0:00 shows as 0:05', pick('mce-dur',0,0), '0:05');
+      w.savePlanEx();
+      ok('plan: 0:00 stores 5, not 300', S().plans[0].exercises[1].durationSecs, 5);
+      w.openEditPlanEx('x2'); pick('mce-dur',1,30); w.savePlanEx();
+      ok('plan: 1:30 still stores 90', S().plans[0].exercises[1].durationSecs, 90);
+
+      // A rest is still allowed to be zero.
+      w.openEditPlanEx('x2'); w.mcetToggle('reps');
+      ok('plan: a rest of 0:00 still shows 0:00', pick('mce-pause',0,0), '0:00');
+      w.savePlanEx();
+      ok('plan: a rest of 0:00 still stores 0', S().plans[0].exercises[1].pauseSecs, 0);
+      w.openEditPlanEx('x2'); w.mcetToggle('time'); w.savePlanEx();
+
+      // Adjust for today.
+      w.startWithPlan('p1'); w.openDetail('x2'); w.openAdjust();
+      ok('adjust: 0:00 shows as 0:05', pick('adj-durationSecs',0,0), '0:05');
+      w.saveAdjust();
+      ok('adjust: 0:00 stores 5 for today', S().progress.p1.overrides.x2.durationSecs, 5);
+      w.openAdjust(); pick('adj-durationSecs',1,0); w.saveAdjust();
+      ok('adjust: 1:00 still stores 60', S().progress.p1.overrides.x2.durationSecs, 60);
+      ok('what was stored is what is saved', JSON.parse(w.localStorage.getItem('tp4_state')).progress.p1.overrides.x2.durationSecs, 60);
+    """
+    report(drive(DEMO, body), "exercise duration floor")
+
+
 def main():
     # Every test_* function runs, in the order it is defined. A hand-kept list
     # here made every new test a merge conflict and could silently skip one.

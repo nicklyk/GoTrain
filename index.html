@@ -674,7 +674,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit
       <div class="s-row"><div class="s-lbl" data-i="field.pause"></div><button class="dur-field" id="gex-pause" onclick="durFieldOpen('gex-pause',t('field.pause'),true,state.globalPauseSecs)"></button></div>
     </div>
     <div id="gex-time-fields" style="display:none">
-      <div class="s-row"><div class="s-lbl" data-i="field.duration"></div><button class="dur-field" id="gex-dur" onclick="durFieldOpen('gex-dur',t('field.duration'),false,0)"></button></div>
+      <div class="s-row"><div class="s-lbl" data-i="field.duration"></div><button class="dur-field" id="gex-dur" onclick="durFieldOpen('gex-dur',t('field.duration'),false,0,WHEEL_SEC_STEP)"></button></div>
     </div>
     <div class="s-row"><div class="s-lbl" data-i="field.note"></div><input class="s-inp" id="gex-note" type="text"></div>
     <div class="modal-btns"><div class="m-btn accent" id="mgex-save-btn" onclick="saveGex()"></div></div>
@@ -1581,7 +1581,7 @@ function wheelInit(){
   [mins,secs].forEach(col=>col.addEventListener('scroll',()=>wheelMark(col),{passive:true}));
 }
 
-// opts: {title, value (secs or null), nullable, defaultSecs, onPick}
+// opts: {title, value (secs or null), nullable, defaultSecs, minSecs, onPick}
 function openDurationPicker(opts){
   durCtx=opts||{};
   document.getElementById('dur-title').textContent=durCtx.title||t('field.duration');
@@ -1619,9 +1619,14 @@ function durCancel(){ durCtx=null; closeModal('durSheet'); }
 function durConfirm(){
   if(!durCtx) return;
   const useDefault=!!durCtx.nullable&&document.getElementById('dur-default').classList.contains('on');
-  const val=useDefault?null:
+  let val=useDefault?null:
     wheelIndex(document.getElementById('dur-min'))*60
     + wheelIndex(document.getElementById('dur-sec'))*WHEEL_SEC_STEP;
+  // The wheel reaches 0:00 because a rest may be zero. An exercise length may
+  // not: the editors used to turn it into 5:00 behind the user's back and
+  // "Adjust for today" kept a 0. Snap up to the floor here, so the field shows
+  // what is stored and every caller gets the same answer.
+  if(val!=null&&durCtx.minSecs&&val<durCtx.minSecs) val=durCtx.minSecs;
   const cb=durCtx.onPick; durCancel(); if(cb) cb(val);
 }
 
@@ -1641,9 +1646,11 @@ function durFieldValue(id){
   const n=parseInt(el.dataset.secs,10);
   return Number.isFinite(n)?n:null;
 }
-function durFieldOpen(id,title,nullable,defSecs){
+// minSecs is set for an exercise's length (WHEEL_SEC_STEP, the smallest step
+// above 0:00) and left out for a rest, where 0:00 means "no rest".
+function durFieldOpen(id,title,nullable,defSecs,minSecs){
   openDurationPicker({title:title,value:durFieldValue(id),nullable:nullable,defaultSecs:defSecs,
-    onPick:v=>durFieldSet(id,v,nullable,defSecs)});
+    minSecs:minSecs,onPick:v=>durFieldSet(id,v,nullable,defSecs)});
 }
 function openGlobalPausePicker(){
   openDurationPicker({title:t('gs.pause.lbl'),value:state.globalPauseSecs,onPick:v=>{
@@ -1979,7 +1986,7 @@ function openAdjust(){
     const raw=base[f.key];
     const planVal=raw===undefined||raw===''?'–':(f.type==='duration'?fmtDur(raw):raw);
     const control=f.type==='duration'
-      ? `<button class="dur-field" id="adj-${f.key}" onclick="durFieldOpen('adj-${f.key}',t('${f.label}'),false,0)"></button>`
+      ? `<button class="dur-field" id="adj-${f.key}" onclick="durFieldOpen('adj-${f.key}',t('${f.label}'),false,0,WHEEL_SEC_STEP)"></button>`
       : `<input class="s-inp" id="adj-${f.key}" type="${f.type}" inputmode="decimal"
              ${f.min!=null?`min="${f.min}"`:''} ${f.max!=null?`max="${f.max}"`:''}
              value="${escAttr(ex[f.key]===undefined?'':ex[f.key])}">`;
@@ -2983,7 +2990,7 @@ function saveGex(){
     reps:document.getElementById('gex-reps').value.trim(),sets:parseSetCount(document.getElementById('gex-sets').value),
     sithoehe:document.getElementById('gex-sitz').value.trim(),kg:document.getElementById('gex-kg').value.trim(),
     pauseSecs:durFieldValue('gex-pause'),
-    durationSecs:durFieldValue('gex-dur')||300,note:document.getElementById('gex-note').value.trim()};
+    durationSecs:durFieldValue('gex-dur')??300,note:document.getElementById('gex-note').value.trim()};
   if(editingGexId){ const idx=state.globalExercises.findIndex(g=>g.id===editingGexId); if(idx>=0) state.globalExercises[idx]={...state.globalExercises[idx],...data}; }
   else state.globalExercises.push({id:uid(),...data});
   saveState();closeModal('modalAddGex');renderGexList();
@@ -3063,7 +3070,7 @@ function openCustomizeExModal(data,btnLabel,isNew){
       <div class="s-row"><div class="s-lbl">${t('field.pause')}</div><button class="dur-field" id="mce-pause" onclick="durFieldOpen('mce-pause',t('field.pause'),true,state.globalPauseSecs)"></button></div>
     </div>
     <div id="mce-time-fields" style="${curType==='time'?'':'display:none'}">
-      <div class="s-row"><div class="s-lbl">${t('field.duration')}</div><button class="dur-field" id="mce-dur" onclick="durFieldOpen('mce-dur',t('field.duration'),false,0)"></button></div>
+      <div class="s-row"><div class="s-lbl">${t('field.duration')}</div><button class="dur-field" id="mce-dur" onclick="durFieldOpen('mce-dur',t('field.duration'),false,0,WHEEL_SEC_STEP)"></button></div>
     </div>
     <div class="s-row"><div class="s-lbl">${t('field.note')}</div><input class="s-inp" id="mce-note" value="${escAttr(data.note||'')}"></div>
     <div class="s-row"><div class="s-lbl">${t('field.phase')}</div><select class="s-inp" id="mce-phase">${phaseOpts}</select></div>`;
@@ -3093,7 +3100,8 @@ function savePlanEx(){
     sithoehe:document.getElementById('mce-sitz')?document.getElementById('mce-sitz').value.trim():'',
     kg:document.getElementById('mce-kg')?document.getElementById('mce-kg').value.trim():'',
     pauseSecs:durFieldValue('mce-pause'),
-    durationSecs:durFieldValue('mce-dur')||300,
+    // ?? not ||: a value the user picked is kept; 300 is only for no value.
+    durationSecs:durFieldValue('mce-dur')??300,
     note:document.getElementById('mce-note')?document.getElementById('mce-note').value.trim():'',
     phaseId:document.getElementById('mce-phase')?document.getElementById('mce-phase').value||null:null
   };
